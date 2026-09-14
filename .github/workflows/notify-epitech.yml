@@ -1,0 +1,31 @@
+name: Notifier le depot Epitech
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Demander la synchronisation
+        env:
+          PARENT_DISPATCH_TOKEN: ${{ secrets.PARENT_DISPATCH_TOKEN }}
+          SOURCE_REPOSITORY: ${{ github.repository }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          if [ -z "$PARENT_DISPATCH_TOKEN" ]; then
+            echo "Le secret PARENT_DISPATCH_TOKEN est absent."
+            exit 1
+          fi
+
+          curl --fail-with-body --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $PARENT_DISPATCH_TOKEN" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/EpitechMscProPromo2027/T-CLO-901-BDX-9-1-kube-1/dispatches \
+            --data "{\"event_type\":\"source-updated\",\"client_payload\":{\"repository\":\"$SOURCE_REPOSITORY\",\"sha\":\"$SOURCE_SHA\"}}"
