@@ -153,7 +153,7 @@
       ansible.builtin.command: k3s kubectl wait --for=condition=Ready node --all --timeout=180s
       changed_when: false
 
-    - name: Patch argocd-cm with the Dex OIDC config (including the Let's Encrypt staging root CA)
+    - name: Patch argocd-cm with the Dex OIDC config
       ansible.builtin.command: >
         k3s kubectl -n argocd patch configmap argocd-cm --type merge
         --patch-file=/tmp/T-CLO-901-infra-identity/playbooks/files/argocd-cm-oidc-patch.yaml
