@@ -3,4 +3,3 @@ kind: Kustomization
 resources:
   - 00-dex.application.yaml
   - httproute.yaml
-  - letsencrypt-staging-ca-configmap.yaml

@@ -22,14 +22,6 @@ spec:
           name: dex-config
         rbac:
           create: true
-        volumes:
-          - name: letsencrypt-staging-ca
-            configMap:
-              name: letsencrypt-staging-ca
-        volumeMounts:
-          - name: letsencrypt-staging-ca
-            mountPath: /etc/dex/ca
-            readOnly: true
   destination:
     server: https://kubernetes.default.svc
     namespace: identity
