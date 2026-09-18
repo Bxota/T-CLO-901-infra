@@ -5,4 +5,4 @@ data:
     issuer: https://dex.15.224.195.86.sslip.io
     clientID: argocd
     clientSecret: $argocd-dex-client:clientSecret
-    requestedScopes: ["profile", "email", "groups"]
+    requestedScopes: ["openid", "profile", "email", "groups"]
