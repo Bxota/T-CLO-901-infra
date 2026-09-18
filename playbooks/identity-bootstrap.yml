@@ -103,6 +103,12 @@
       when: dex_config_secret.rc != 0
       no_log: true
 
+    - name: Label the Argo CD Dex client Secret so argocd-cm's $name:key reference resolves
+      ansible.builtin.command: >
+        k3s kubectl -n argocd label secret argocd-dex-client
+        app.kubernetes.io/part-of=argocd --overwrite
+      when: dex_config_secret.rc != 0
+
     - name: Create the Grafana Dex client Secret (contract for spec 5)
       ansible.builtin.command: >
         k3s kubectl -n identity create secret generic grafana-dex-client
