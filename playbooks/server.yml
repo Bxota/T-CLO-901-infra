@@ -1,0 +1,24 @@
+---
+- hosts: localhost
+  connection: local
+  become: true
+  tasks:
+    - name: Install k3s server
+      ansible.builtin.shell: |
+        curl -sfL https://get.k3s.io | sh -s - server \
+          --disable traefik \
+          --disable servicelb \
+          --node-taint node-role.kubernetes.io/control-plane:NoSchedule
+      args:
+        creates: /usr/local/bin/k3s
+
+    - name: Fetch the node join token
+      ansible.builtin.slurp:
+        src: /var/lib/rancher/k3s/server/node-token
+      register: join_token
+
+    - name: Print private IP and join token for the agents
+      ansible.builtin.debug:
+        msg:
+          - "PRIVATE_IP={{ ansible_default_ipv4.address }}"
+          - "TOKEN={{ join_token.content | b64decode | trim }}"
