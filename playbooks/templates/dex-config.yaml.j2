@@ -21,6 +21,7 @@ connectors:
       clientSecret: "{{ dex_client_secret }}"
       redirectURI: https://dex.15.224.195.86.sslip.io/callback
       insecureSkipEmailVerified: true
+      userNameKey: email
       scopes:
         - email
         - groups
