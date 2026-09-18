@@ -34,3 +34,20 @@
 
     - name: Apply the root Argo CD Applications
       ansible.builtin.command: k3s kubectl apply -f /tmp/T-CLO-901-infra-bootstrap/argocd/apps/
+
+    - name: Check current argocd-server insecure setting
+      ansible.builtin.shell: >
+        k3s kubectl -n argocd get configmap argocd-cmd-params-cm -o json
+        | grep -o '"server.insecure":"true"' || true
+      register: argocd_insecure_setting
+      changed_when: false
+
+    - name: Configure argocd-server to serve plain HTTP (TLS is terminated at the Gateway)
+      ansible.builtin.command: >
+        k3s kubectl -n argocd patch configmap argocd-cmd-params-cm
+        --type merge -p '{"data":{"server.insecure":"true"}}'
+      when: argocd_insecure_setting.stdout == ""
+
+    - name: Restart argocd-server to pick up the insecure setting
+      ansible.builtin.command: k3s kubectl -n argocd rollout restart deployment argocd-server
+      when: argocd_insecure_setting.stdout == ""
