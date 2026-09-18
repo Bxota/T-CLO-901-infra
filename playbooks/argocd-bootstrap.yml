@@ -1,0 +1,36 @@
+---
+- hosts: localhost
+  connection: local
+  become: true
+  tasks:
+    - name: Check whether the argocd namespace already exists
+      ansible.builtin.command: k3s kubectl get namespace argocd
+      register: argocd_ns
+      failed_when: false
+      changed_when: false
+
+    - name: Create the argocd namespace
+      ansible.builtin.command: k3s kubectl create namespace argocd
+      when: argocd_ns.rc != 0
+
+    - name: Install Argo CD (stable upstream manifest)
+      ansible.builtin.command: >
+        k3s kubectl apply -n argocd --server-side --force-conflicts
+        -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+      when: argocd_ns.rc != 0
+
+    - name: Wait for the argocd-server deployment to become available
+      ansible.builtin.command: >
+        k3s kubectl -n argocd wait --for=condition=available
+        --timeout=300s deployment/argocd-server
+      changed_when: false
+
+    - name: Clone the infra repo for its own Argo CD Application manifests
+      ansible.builtin.git:
+        repo: https://github.com/Bxota/T-CLO-901-infra.git
+        dest: /tmp/T-CLO-901-infra-bootstrap
+        version: main
+        force: true
+
+    - name: Apply the root Argo CD Applications
+      ansible.builtin.command: k3s kubectl apply -f /tmp/T-CLO-901-infra-bootstrap/argocd/apps/
