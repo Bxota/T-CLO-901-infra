@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+patches:
+  - path: production-issuer.yaml
+    target:
+      group: cert-manager.io
+      version: v1
+      kind: Certificate
+      labelSelector: networking.kubequest2.io/certificate=public
