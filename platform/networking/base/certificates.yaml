@@ -3,7 +3,9 @@ kind: Certificate
 metadata:
   name: app-certificate
   namespace: envoy-gateway-system
-  annotations: {argocd.argoproj.io/sync-wave: "2"}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
   labels:
     networking.kubequest2.io/certificate: public
 spec:
@@ -20,7 +22,9 @@ kind: Certificate
 metadata:
   name: headlamp-certificate
   namespace: envoy-gateway-system
-  annotations: {argocd.argoproj.io/sync-wave: "2"}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
   labels:
     networking.kubequest2.io/certificate: public
 spec:
@@ -37,7 +41,9 @@ kind: Certificate
 metadata:
   name: grafana-certificate
   namespace: envoy-gateway-system
-  annotations: {argocd.argoproj.io/sync-wave: "2"}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
   labels:
     networking.kubequest2.io/certificate: public
 spec:
@@ -54,7 +60,9 @@ kind: Certificate
 metadata:
   name: argocd-certificate
   namespace: envoy-gateway-system
-  annotations: {argocd.argoproj.io/sync-wave: "2"}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
   labels:
     networking.kubequest2.io/certificate: public
 spec:

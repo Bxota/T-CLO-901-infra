@@ -3,7 +3,9 @@ kind: EnvoyProxy
 metadata:
   name: public-proxy
   namespace: envoy-gateway-system
-  annotations: {argocd.argoproj.io/sync-wave: "0"}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   provider:
     type: Kubernetes
@@ -14,19 +16,22 @@ spec:
           type: StrategicMerge
           value:
             spec:
-              externalTrafficPolicy: Local
+              externalTrafficPolicy: Cluster
               ports:
                 - name: http
                   port: 80
-                  nodePort: 30080
+                  nodePort: 80
                 - name: https
                   port: 443
-                  nodePort: 30443
+                  nodePort: 443
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
 metadata:
   name: public-envoy
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   controllerName: gateway.envoyproxy.io/gatewayclass-controller
   parametersRef:
@@ -40,6 +45,9 @@ kind: Gateway
 metadata:
   name: public-gateway
   namespace: envoy-gateway-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   gatewayClassName: public-envoy
   listeners:
