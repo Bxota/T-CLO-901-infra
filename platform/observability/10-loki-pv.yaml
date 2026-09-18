@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: loki-data
+  labels:
+    app.kubernetes.io/component: loki-data
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  mountOptions:
+    - nfsvers=4.1
+  nfs:
+    server: fs-04525e4ba350e77a0.efs.eu-west-3.amazonaws.com
+    path: /loki

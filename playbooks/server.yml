@@ -3,6 +3,11 @@
   connection: local
   become: true
   tasks:
+    - name: Install NFS client packages (needed for the shared EFS mount)
+      ansible.builtin.dnf:
+        name: nfs-utils
+        state: present
+
     - name: Install k3s server
       ansible.builtin.shell: |
         curl -sfL https://get.k3s.io | sh -s - server \

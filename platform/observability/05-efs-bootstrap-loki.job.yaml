@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: efs-bootstrap-loki
+  namespace: monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mkdir
+          image: busybox:1.37.0
+          command: ["sh", "-c", "mkdir -p /export/loki && chown 10001:10001 /export/loki && chmod 0775 /export/loki"]
+          volumeMounts:
+            - name: efs-root
+              mountPath: /export
+      volumes:
+        - name: efs-root
+          nfs:
+            server: fs-04525e4ba350e77a0.efs.eu-west-3.amazonaws.com
+            path: /
