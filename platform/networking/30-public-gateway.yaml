@@ -67,6 +67,8 @@ spec:
           - name: headlamp-tls
           - name: grafana-tls
           - name: argocd-tls
+          - name: keycloak-tls
+          - name: dex-tls
       allowedRoutes:
         namespaces:
           from: All
