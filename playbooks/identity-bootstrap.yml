@@ -1,0 +1,177 @@
+---
+- hosts: localhost
+  connection: local
+  become: true
+  tasks:
+    - name: Clone the infra repo for its Jinja2 templates
+      ansible.builtin.git:
+        repo: https://github.com/Bxota/T-CLO-901-infra.git
+        dest: /tmp/T-CLO-901-infra-identity
+        version: main
+        force: true
+
+    - name: Check whether the identity secrets already exist
+      ansible.builtin.command: k3s kubectl -n identity get secret dex-config
+      register: dex_config_secret
+      failed_when: false
+      changed_when: false
+
+    - name: Generate the Dex-to-Keycloak client secret
+      ansible.builtin.command: openssl rand -hex 32
+      register: dex_client_secret_raw
+      changed_when: false
+      when: dex_config_secret.rc != 0
+
+    - name: Generate the Dex-to-Argo-CD client secret
+      ansible.builtin.command: openssl rand -hex 32
+      register: argocd_client_secret_raw
+      changed_when: false
+      when: dex_config_secret.rc != 0
+
+    - name: Generate the Dex-to-Grafana client secret
+      ansible.builtin.command: openssl rand -hex 32
+      register: grafana_client_secret_raw
+      changed_when: false
+      when: dex_config_secret.rc != 0
+
+    - name: Generate the Dex-to-Headlamp client secret
+      ansible.builtin.command: openssl rand -hex 32
+      register: headlamp_client_secret_raw
+      changed_when: false
+      when: dex_config_secret.rc != 0
+
+    - name: Generate the Keycloak admin password
+      ansible.builtin.command: openssl rand -hex 16
+      register: keycloak_admin_password_raw
+      changed_when: false
+      when: dex_config_secret.rc != 0
+
+    - name: Set facts for the generated secrets
+      ansible.builtin.set_fact:
+        dex_client_secret: "{{ dex_client_secret_raw.stdout | trim }}"
+        argocd_client_secret: "{{ argocd_client_secret_raw.stdout | trim }}"
+        grafana_client_secret: "{{ grafana_client_secret_raw.stdout | trim }}"
+        headlamp_client_secret: "{{ headlamp_client_secret_raw.stdout | trim }}"
+        keycloak_admin_password: "{{ keycloak_admin_password_raw.stdout | trim }}"
+      when: dex_config_secret.rc != 0
+      no_log: true
+
+    - name: Render the Keycloak realm export
+      ansible.builtin.template:
+        src: /tmp/T-CLO-901-infra-identity/playbooks/templates/kubequest2-realm.json.j2
+        dest: /tmp/kubequest2-realm.json
+        mode: "0600"
+      when: dex_config_secret.rc != 0
+      no_log: true
+
+    - name: Render the Dex config
+      ansible.builtin.template:
+        src: /tmp/T-CLO-901-infra-identity/playbooks/templates/dex-config.yaml.j2
+        dest: /tmp/dex-config.yaml
+        mode: "0600"
+      when: dex_config_secret.rc != 0
+      no_log: true
+
+    - name: Wait for the identity namespace to exist (created by the platform Application)
+      ansible.builtin.command: k3s kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/identity --timeout=120s
+      changed_when: false
+
+    - name: Create the Keycloak admin Secret
+      ansible.builtin.command: >
+        k3s kubectl -n identity create secret generic keycloak-admin
+        --from-literal=username=admin
+        --from-literal=password={{ keycloak_admin_password }}
+      when: dex_config_secret.rc != 0
+      no_log: true
+
+    - name: Create the Keycloak realm-config Secret
+      ansible.builtin.command: >
+        k3s kubectl -n identity create secret generic keycloak-realm-config
+        --from-file=kubequest2-realm.json=/tmp/kubequest2-realm.json
+      when: dex_config_secret.rc != 0
+
+    - name: Create the Dex config Secret
+      ansible.builtin.command: >
+        k3s kubectl -n identity create secret generic dex-config
+        --from-file=config.yaml=/tmp/dex-config.yaml
+      when: dex_config_secret.rc != 0
+
+    - name: Create the Argo CD Dex client Secret
+      ansible.builtin.command: >
+        k3s kubectl -n argocd create secret generic argocd-dex-client
+        --from-literal=clientSecret={{ argocd_client_secret }}
+      when: dex_config_secret.rc != 0
+      no_log: true
+
+    - name: Create the Grafana Dex client Secret (contract for spec 5)
+      ansible.builtin.command: >
+        k3s kubectl -n identity create secret generic grafana-dex-client
+        --from-literal=clientId=grafana
+        --from-literal=clientSecret={{ grafana_client_secret }}
+      when: dex_config_secret.rc != 0
+      no_log: true
+
+    - name: Create the Headlamp Dex client Secret (contract for spec 5)
+      ansible.builtin.command: >
+        k3s kubectl -n identity create secret generic headlamp-dex-client
+        --from-literal=clientId=headlamp
+        --from-literal=clientSecret={{ headlamp_client_secret }}
+      when: dex_config_secret.rc != 0
+      no_log: true
+
+    - name: Shred the rendered template files (they hold plaintext secrets)
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/kubequest2-realm.json
+        - /tmp/dex-config.yaml
+      when: dex_config_secret.rc != 0
+
+    - name: Check whether the live k3s unit already has the OIDC flags
+      ansible.builtin.command: grep -q oidc-issuer-url /etc/systemd/system/k3s.service
+      register: k3s_oidc_flags
+      failed_when: false
+      changed_when: false
+
+    - name: Re-run the k3s installer with OIDC flags added (rewrites the systemd unit, restarts k3s)
+      ansible.builtin.shell: |
+        curl -sfL https://get.k3s.io | sh -s - server \
+          --disable traefik \
+          --disable servicelb \
+          --node-taint node-role.kubernetes.io/control-plane:NoSchedule \
+          --service-node-port-range=80-32767 \
+          --kube-apiserver-arg=oidc-issuer-url=https://dex.15.224.195.86.sslip.io \
+          --kube-apiserver-arg=oidc-client-id=kubernetes \
+          --kube-apiserver-arg=oidc-username-claim=email \
+          --kube-apiserver-arg=oidc-username-prefix=oidc: \
+          --kube-apiserver-arg=oidc-groups-claim=groups \
+          --kube-apiserver-arg=oidc-groups-prefix=oidc:
+      when: k3s_oidc_flags.rc != 0
+
+    - name: Wait for the apiserver to come back after the restart
+      ansible.builtin.command: k3s kubectl wait --for=condition=Ready node --all --timeout=180s
+      changed_when: false
+
+    - name: Patch argocd-cm with the Dex OIDC config (including the Let's Encrypt staging root CA)
+      ansible.builtin.command: >
+        k3s kubectl -n argocd patch configmap argocd-cm --type merge
+        --patch-file=/tmp/T-CLO-901-infra-identity/playbooks/files/argocd-cm-oidc-patch.yaml
+
+    - name: Patch argocd-rbac-cm with the group-role mapping
+      ansible.builtin.shell: |
+        k3s kubectl -n argocd patch configmap argocd-rbac-cm --type merge -p '{
+          "data": {
+            "policy.csv": "g, platform-admin, role:admin\ng, developer, role:edit\ng, viewer, role:readonly\n",
+            "policy.default": "role:readonly"
+          }
+        }'
+
+    - name: Restart argocd-server to pick up the new config
+      ansible.builtin.command: k3s kubectl -n argocd rollout restart deployment argocd-server
+
+    - name: Wait for argocd-server to become available again
+      ansible.builtin.command: >
+        k3s kubectl -n argocd wait --for=condition=available
+        --timeout=180s deployment/argocd-server
+      changed_when: false
