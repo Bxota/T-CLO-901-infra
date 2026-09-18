@@ -5,3 +5,4 @@ resources:
   - networking
   - argocd-ui
   - identity
+  - observability
