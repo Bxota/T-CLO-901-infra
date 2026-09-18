@@ -20,6 +20,44 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
+  name: keycloak-certificate
+  namespace: envoy-gateway-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    networking.kubequest2.io/certificate: public
+spec:
+  secretName: keycloak-tls
+  dnsNames:
+    - keycloak.15.224.195.86.sslip.io
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: letsencrypt-staging
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: dex-certificate
+  namespace: envoy-gateway-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    networking.kubequest2.io/certificate: public
+spec:
+  secretName: dex-tls
+  dnsNames:
+    - dex.15.224.195.86.sslip.io
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: letsencrypt-staging
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
   name: headlamp-certificate
   namespace: envoy-gateway-system
   annotations:

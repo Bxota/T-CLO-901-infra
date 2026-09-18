@@ -1,0 +1,58 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keycloak
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://codecentric.github.io/helm-charts
+    chart: keycloakx
+    targetRevision: 7.2.0
+    helm:
+      releaseName: keycloak
+      values: |
+        image:
+          repository: quay.io/keycloak/keycloak
+          tag: "26.6.2"
+        command:
+          - /opt/keycloak/bin/kc.sh
+        args:
+          - start
+          - --http-enabled=true
+          - --hostname=https://keycloak.15.224.195.86.sslip.io
+          - --proxy-headers=xforwarded
+          - --import-realm
+        http:
+          relativePath: "/"
+        extraEnv: |
+          - name: KC_BOOTSTRAP_ADMIN_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: keycloak-admin
+                key: username
+          - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: keycloak-admin
+                key: password
+        extraVolumes: |
+          - name: realm-config
+            secret:
+              secretName: keycloak-realm-config
+        extraVolumeMounts: |
+          - name: realm-config
+            mountPath: /opt/keycloak/data/import
+            readOnly: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: identity
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

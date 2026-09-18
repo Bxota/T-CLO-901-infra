@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dex
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://charts.dexidp.io
+    chart: dex
+    targetRevision: 0.24.1
+    helm:
+      releaseName: dex
+      values: |
+        image:
+          tag: v2.44.0
+        config: {}
+        configSecret:
+          create: false
+          name: dex-config
+        rbac:
+          create: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: identity
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

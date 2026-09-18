@@ -9,7 +9,13 @@
           --disable traefik \
           --disable servicelb \
           --node-taint node-role.kubernetes.io/control-plane:NoSchedule \
-          --service-node-port-range=80-32767
+          --service-node-port-range=80-32767 \
+          --kube-apiserver-arg=oidc-issuer-url=https://dex.15.224.195.86.sslip.io \
+          --kube-apiserver-arg=oidc-client-id=kubernetes \
+          --kube-apiserver-arg=oidc-username-claim=email \
+          --kube-apiserver-arg=oidc-username-prefix=oidc: \
+          --kube-apiserver-arg=oidc-groups-claim=groups \
+          --kube-apiserver-arg=oidc-groups-prefix=oidc:
       args:
         creates: /usr/local/bin/k3s
 

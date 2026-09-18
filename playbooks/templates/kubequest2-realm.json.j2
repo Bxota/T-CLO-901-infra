@@ -1,0 +1,73 @@
+{
+  "realm": "kubequest2",
+  "enabled": true,
+  "sslRequired": "external",
+  "groups": [
+    { "name": "platform-admin" },
+    { "name": "developer" },
+    { "name": "viewer" }
+  ],
+  "users": [
+    {
+      "username": "alice-admin",
+      "enabled": true,
+      "email": "alice-admin@kubequest2.local",
+      "emailVerified": true,
+      "groups": ["/platform-admin"],
+      "credentials": [
+        { "type": "password", "value": "ChangeMe-Admin1!", "temporary": true }
+      ]
+    },
+    {
+      "username": "bob-dev",
+      "enabled": true,
+      "email": "bob-dev@kubequest2.local",
+      "emailVerified": true,
+      "groups": ["/developer"],
+      "credentials": [
+        { "type": "password", "value": "ChangeMe-Dev1!", "temporary": true }
+      ]
+    },
+    {
+      "username": "carol-view",
+      "enabled": true,
+      "email": "carol-view@kubequest2.local",
+      "emailVerified": true,
+      "groups": ["/viewer"],
+      "credentials": [
+        { "type": "password", "value": "ChangeMe-View1!", "temporary": true }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "dex",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "secret": "{{ dex_client_secret }}",
+      "redirectUris": [
+        "https://dex.15.224.195.86.sslip.io/callback"
+      ],
+      "webOrigins": [
+        "https://dex.15.224.195.86.sslip.io"
+      ],
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "groups"
+          }
+        }
+      ]
+    }
+  ]
+}
