@@ -8,7 +8,8 @@
         curl -sfL https://get.k3s.io | sh -s - server \
           --disable traefik \
           --disable servicelb \
-          --node-taint node-role.kubernetes.io/control-plane:NoSchedule
+          --node-taint node-role.kubernetes.io/control-plane:NoSchedule \
+          --service-node-port-range=80-32767
       args:
         creates: /usr/local/bin/k3s
 
