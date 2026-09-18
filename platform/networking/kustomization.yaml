@@ -6,4 +6,4 @@ resources:
   - 20-cert-manager.application.yaml
   - 30-public-gateway.yaml
   - 40-cluster-issuers.yaml
-  - overlays/staging
+  - overlays/production
