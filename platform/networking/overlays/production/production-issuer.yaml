@@ -1,0 +1,9 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: public-certificates
+  labels:
+    networking.kubequest2.io/certificate: public
+spec:
+  issuerRef:
+    name: letsencrypt-production
