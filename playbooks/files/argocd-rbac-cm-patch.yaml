@@ -1,0 +1,6 @@
+data:
+  policy.csv: |
+    g, platform-admin, role:admin
+    g, developer, role:edit
+    g, viewer, role:readonly
+  policy.default: role:readonly

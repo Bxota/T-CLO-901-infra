@@ -159,13 +159,9 @@
         --patch-file=/tmp/T-CLO-901-infra-identity/playbooks/files/argocd-cm-oidc-patch.yaml
 
     - name: Patch argocd-rbac-cm with the group-role mapping
-      ansible.builtin.shell: |
-        k3s kubectl -n argocd patch configmap argocd-rbac-cm --type merge -p '{
-          "data": {
-            "policy.csv": "g, platform-admin, role:admin\ng, developer, role:edit\ng, viewer, role:readonly\n",
-            "policy.default": "role:readonly"
-          }
-        }'
+      ansible.builtin.command: >
+        k3s kubectl -n argocd patch configmap argocd-rbac-cm --type merge
+        --patch-file=/tmp/T-CLO-901-infra-identity/playbooks/files/argocd-rbac-cm-patch.yaml
 
     - name: Restart argocd-server to pick up the new config
       ansible.builtin.command: k3s kubectl -n argocd rollout restart deployment argocd-server
