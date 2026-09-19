@@ -64,3 +64,6 @@ A full rebuild produces a **new** join token each time `playbooks/server.yml` in
 
 - `playbooks/server.yml` — installs k3s on the control plane (`kube-1`), disables the bundled Traefik/servicelb, applies the control-plane taint, prints the join token and private IP.
 - `playbooks/agent.yml` — installs k3s and joins the cluster, given `k3s_server_ip` and `k3s_token` as extra-vars.
+- `playbooks/sealed-secrets-restore.yml` — re-creates the Sealed Secrets controller key from `playbooks/files/sealed-secrets-key.vault.yaml` (Ansible Vault, password held outside Git); run on `kube-1` before `argocd-bootstrap.yml` on a rebuild.
+- `platform/secrets/` — the Sealed Secrets controller Application (`kube-system/sealed-secrets-controller`).
+- `sealed-secrets/pub-cert.pem` — public sealing certificate; `kubeseal --cert sealed-secrets/pub-cert.pem` needs no cluster access.
