@@ -1,4 +1,9 @@
 ---
+# First-bootstrap path only. On a cluster whose SealedSecrets (platform/identity/sealed)
+# have already been synced by the platform Application, the existence check below finds
+# identity/dex-config and every secret-generation task is skipped; the play then only
+# applies the k3s OIDC flags and the Argo CD ConfigMap patches. Regenerating secrets here
+# would desynchronise them from the committed SealedSecrets.
 - hosts: localhost
   connection: local
   become: true
