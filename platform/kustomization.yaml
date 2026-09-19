@@ -4,5 +4,6 @@ resources:
   - namespaces
   - networking
   - argocd-ui
+  - secrets
   - identity
   - observability
