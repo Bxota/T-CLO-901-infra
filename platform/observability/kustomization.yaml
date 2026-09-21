@@ -24,3 +24,7 @@ configMapGenerator:
     namespace: monitoring
     files:
       - app-overview.json=dashboards/app-overview.json
+  - name: dashboard-platform-health
+    namespace: monitoring
+    files:
+      - platform-health.json=dashboards/platform-health.json
