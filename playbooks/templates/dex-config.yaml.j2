@@ -34,11 +34,6 @@ staticClients:
     public: true
     redirectURIs:
       - http://localhost:8000
-    # Headlamp forwards its own ID token straight to the k8s API server as a
-    # bearer token, so that token's audience must satisfy the apiserver's
-    # --oidc-client-id=kubernetes check. trustedPeers lets Headlamp request
-    # the audience:server:client_id:kubernetes scope to get "kubernetes"
-    # added to its token's aud claim alongside its own client ID.
     trustedPeers:
       - headlamp
 
