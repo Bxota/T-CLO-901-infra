@@ -1,0 +1,122 @@
+{
+  "uid": "kq-cluster-nodes",
+  "title": "KubeQuest / Cluster nodes",
+  "tags": ["kubequest", "cluster"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "editable": true,
+  "time": {"from": "now-3h", "to": "now"},
+  "refresh": "1m",
+  "templating": {
+    "list": [
+      {
+        "name": "node",
+        "label": "Node",
+        "type": "query",
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "query": "label_values(kube_node_info, node)",
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": {"text": "All", "value": "$__all"}
+      }
+    ]
+  },
+  "annotations": {"list": []},
+  "panels": [
+    {"id": 1, "type": "row", "title": "Cluster capacity", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}, "collapsed": false, "panels": []},
+    {
+      "id": 2, "type": "gauge", "title": "CPU requested / allocatable",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sum(kube_pod_container_resource_requests{resource=\"cpu\"}) / sum(kube_node_status_allocatable{resource=\"cpu\"})", "instant": true}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": ""}, "showThresholdMarkers": true},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.7}, {"color": "red", "value": 0.9}]}}, "overrides": []}
+    },
+    {
+      "id": 3, "type": "gauge", "title": "Memory requested / allocatable",
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sum(kube_pod_container_resource_requests{resource=\"memory\"}) / sum(kube_node_status_allocatable{resource=\"memory\"})", "instant": true}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": ""}, "showThresholdMarkers": true},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.7}, {"color": "red", "value": 0.9}]}}, "overrides": []}
+    },
+    {
+      "id": 4, "type": "stat", "title": "Nodes Ready",
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sum(kube_node_status_condition{condition=\"Ready\", status=\"true\"})", "legendFormat": "ready", "instant": true},
+        {"refId": "B", "expr": "count(kube_node_info)", "legendFormat": "total", "instant": true}
+      ],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": ""}, "textMode": "value_and_name", "colorMode": "value", "graphMode": "none"},
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 3}]}}, "overrides": [{"matcher": {"id": "byName", "options": "total"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "text"}}]}]}
+    },
+    {
+      "id": 5, "type": "bargauge", "title": "Persistent volume usage",
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes", "legendFormat": "{{namespace}}/{{persistentvolumeclaim}}", "instant": true}],
+      "options": {"orientation": "horizontal", "displayMode": "gradient", "reduceOptions": {"calcs": ["lastNotNull"], "fields": ""}, "showUnfilled": true},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.75}, {"color": "red", "value": 0.9}]}}, "overrides": []}
+    },
+    {"id": 10, "type": "row", "title": "Node $node", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 7}, "collapsed": false, "repeat": "node", "panels": []},
+    {
+      "id": 11, "type": "gauge", "title": "CPU",
+      "gridPos": {"h": 6, "w": 4, "x": 0, "y": 8},
+      "repeatDirection": "h",
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]) * on (instance) group_left (nodename) node_uname_info{nodename=\"$node\"})", "instant": true}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": ""}, "showThresholdMarkers": true},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.7}, {"color": "red", "value": 0.9}]}}, "overrides": []}
+    },
+    {
+      "id": 12, "type": "gauge", "title": "Memory",
+      "gridPos": {"h": 6, "w": 4, "x": 4, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "1 - (node_memory_MemAvailable_bytes * on (instance) group_left (nodename) node_uname_info{nodename=\"$node\"}) / (node_memory_MemTotal_bytes * on (instance) group_left (nodename) node_uname_info{nodename=\"$node\"})", "instant": true}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": ""}, "showThresholdMarkers": true},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.7}, {"color": "red", "value": 0.9}]}}, "overrides": []}
+    },
+    {
+      "id": 13, "type": "gauge", "title": "Root disk",
+      "gridPos": {"h": 6, "w": 4, "x": 8, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "1 - (node_filesystem_avail_bytes{mountpoint=\"/\", fstype!=\"rootfs\"} * on (instance) group_left (nodename) node_uname_info{nodename=\"$node\"}) / (node_filesystem_size_bytes{mountpoint=\"/\", fstype!=\"rootfs\"} * on (instance) group_left (nodename) node_uname_info{nodename=\"$node\"})", "instant": true}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": ""}, "showThresholdMarkers": true},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.75}, {"color": "red", "value": 0.9}]}}, "overrides": []}
+    },
+    {
+      "id": 14, "type": "stat", "title": "Pods / capacity",
+      "gridPos": {"h": 6, "w": 4, "x": 12, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "count(kube_pod_info{node=\"$node\"})", "legendFormat": "pods", "instant": true},
+        {"refId": "B", "expr": "kube_node_status_allocatable{node=\"$node\", resource=\"pods\"}", "legendFormat": "capacity", "instant": true}
+      ],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": ""}, "textMode": "value_and_name", "colorMode": "none", "graphMode": "none"},
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 0}, "overrides": []}
+    },
+    {
+      "id": 15, "type": "stat", "title": "Conditions",
+      "gridPos": {"h": 6, "w": 5, "x": 16, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "kube_node_status_condition{node=\"$node\", condition=\"Ready\", status=\"true\"}", "legendFormat": "Ready", "instant": true},
+        {"refId": "B", "expr": "1 - kube_node_status_condition{node=\"$node\", condition=\"MemoryPressure\", status=\"true\"}", "legendFormat": "No MemoryPressure", "instant": true},
+        {"refId": "C", "expr": "1 - kube_node_status_condition{node=\"$node\", condition=\"DiskPressure\", status=\"true\"}", "legendFormat": "No DiskPressure", "instant": true}
+      ],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": ""}, "textMode": "name", "colorMode": "background", "graphMode": "none"},
+      "fieldConfig": {"defaults": {"unit": "none", "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []}
+    },
+    {
+      "id": 16, "type": "stat", "title": "Role",
+      "gridPos": {"h": 6, "w": 3, "x": 21, "y": 8},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "count(kube_node_spec_taint{node=\"$node\", key=\"node-role.kubernetes.io/control-plane\"}) or vector(0)", "instant": true}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": ""}, "textMode": "value", "colorMode": "background", "graphMode": "none"},
+      "fieldConfig": {"defaults": {"unit": "none", "mappings": [{"type": "value", "options": {"0": {"text": "worker", "color": "blue", "index": 0}, "1": {"text": "control-plane (tainted)", "color": "purple", "index": 1}}}], "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}]}}, "overrides": []}
+    }
+  ]
+}

@@ -28,3 +28,7 @@ configMapGenerator:
     namespace: monitoring
     files:
       - platform-health.json=dashboards/platform-health.json
+  - name: dashboard-cluster-nodes
+    namespace: monitoring
+    files:
+      - cluster-nodes.json=dashboards/cluster-nodes.json
