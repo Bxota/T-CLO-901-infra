@@ -97,6 +97,27 @@ spec:
               jsonData:
                 implementation: prometheus
                 handleGrafanaManagedAlerts: false
+          envValueFrom:
+            GF_AUTH_GENERIC_OAUTH_CLIENT_ID:
+              secretKeyRef:
+                name: grafana-dex-client
+                key: clientID
+            GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
+              secretKeyRef:
+                name: grafana-dex-client
+                key: clientSecret
+          grafana.ini:
+            server:
+              root_url: https://grafana.15.224.195.86.sslip.io
+            auth.generic_oauth:
+              enabled: true
+              name: Keycloak
+              allow_sign_up: true
+              scopes: "openid email groups"
+              auth_url: https://dex.15.224.195.86.sslip.io/auth
+              token_url: https://dex.15.224.195.86.sslip.io/token
+              api_url: https://dex.15.224.195.86.sslip.io/userinfo
+              role_attribute_path: "contains(groups[*], 'platform-admin') && 'GrafanaAdmin' || contains(groups[*], 'developer') && 'Editor' || 'Viewer'"
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
