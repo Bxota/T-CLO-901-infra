@@ -111,7 +111,7 @@ spec:
               root_url: https://grafana.15.224.195.86.sslip.io
             auth.generic_oauth:
               enabled: true
-              name: Keycloak
+              name: Dex
               allow_sign_up: true
               scopes: "openid email groups"
               auth_url: https://dex.15.224.195.86.sslip.io/auth
