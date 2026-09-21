@@ -1,0 +1,135 @@
+{
+  "uid": "kq-platform-health",
+  "title": "KubeQuest / Platform health",
+  "tags": ["kubequest", "platform"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "editable": true,
+  "time": {"from": "now-6h", "to": "now"},
+  "refresh": "1m",
+  "templating": {"list": []},
+  "annotations": {"list": []},
+  "panels": [
+    {"id": 1, "type": "row", "title": "GitOps (Argo CD)", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}, "collapsed": false, "panels": []},
+    {
+      "id": 2, "type": "table", "title": "Applications",
+      "gridPos": {"h": 8, "w": 16, "x": 0, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "argocd_app_info", "format": "table", "instant": true}],
+      "transformations": [
+        {"id": "organize", "options": {"excludeByName": {"Time": true, "__name__": true, "container": true, "endpoint": true, "instance": true, "job": true, "pod": true, "service": true, "Value": true, "autosync_enabled": true, "dest_namespace": true, "dest_server": true, "repo": true, "project": true, "operation": true}, "renameByName": {"name": "Application", "sync_status": "Sync", "health_status": "Health", "revision": "Revision"}}}
+      ],
+      "fieldConfig": {"defaults": {}, "overrides": [
+        {"matcher": {"id": "byName", "options": "Sync"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-background"}}, {"id": "mappings", "value": [{"type": "value", "options": {"Synced": {"color": "green", "index": 0}, "OutOfSync": {"color": "red", "index": 1}, "Unknown": {"color": "orange", "index": 2}}}]}]},
+        {"matcher": {"id": "byName", "options": "Health"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-background"}}, {"id": "mappings", "value": [{"type": "value", "options": {"Healthy": {"color": "green", "index": 0}, "Progressing": {"color": "blue", "index": 1}, "Degraded": {"color": "red", "index": 2}, "Missing": {"color": "red", "index": 3}, "Suspended": {"color": "orange", "index": 4}, "Unknown": {"color": "orange", "index": 5}}}]}]}
+      ]},
+      "options": {"showHeader": true, "sortBy": [{"displayName": "Application"}]}
+    },
+    {
+      "id": 3, "type": "stat", "title": "Apps not Synced / Healthy",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "count(argocd_app_info{sync_status!=\"Synced\"}) or vector(0)", "legendFormat": "not synced", "instant": true},
+        {"refId": "B", "expr": "count(argocd_app_info{health_status!=\"Healthy\"}) or vector(0)", "legendFormat": "not healthy", "instant": true}
+      ],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": ""}, "textMode": "value_and_name", "colorMode": "background", "graphMode": "none"},
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []}
+    },
+    {"id": 10, "type": "row", "title": "TLS (cert-manager)", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 9}, "collapsed": false, "panels": []},
+    {
+      "id": 11, "type": "bargauge", "title": "Days until certificate expiry",
+      "gridPos": {"h": 7, "w": 24, "x": 0, "y": 10},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "(certmanager_certificate_expiration_timestamp_seconds - time()) / 86400", "legendFormat": "{{namespace}}/{{name}}", "instant": true}],
+      "options": {"orientation": "horizontal", "displayMode": "gradient", "reduceOptions": {"calcs": ["lastNotNull"], "fields": ""}, "showUnfilled": true},
+      "fieldConfig": {"defaults": {"unit": "d", "decimals": 0, "min": 0, "max": 90, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "orange", "value": 3}, {"color": "green", "value": 14}]}}, "overrides": []}
+    },
+    {"id": 20, "type": "row", "title": "Gateway (Envoy)", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 17}, "collapsed": false, "panels": []},
+    {
+      "id": 21, "type": "stat", "title": "Active listeners",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 18},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "max(envoy_listener_manager_total_listeners_active)", "instant": true}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": ""}, "textMode": "value", "colorMode": "value", "graphMode": "none"},
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 2}]}}, "overrides": []}
+    },
+    {
+      "id": 22, "type": "timeseries", "title": "Downstream connections",
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 18},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sum(envoy_listener_downstream_cx_active)", "legendFormat": "active"}],
+      "fieldConfig": {"defaults": {"unit": "none", "custom": {"fillOpacity": 10, "lineWidth": 2}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}}
+    },
+    {
+      "id": 23, "type": "timeseries", "title": "Total requests / s",
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 18},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sum(rate(envoy_cluster_upstream_rq_total[5m]))", "legendFormat": "req/s"}],
+      "fieldConfig": {"defaults": {"unit": "reqps", "custom": {"fillOpacity": 10, "lineWidth": 2}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}}
+    },
+    {
+      "id": 24, "type": "timeseries", "title": "Total 5xx / s",
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 18},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sum(rate(envoy_cluster_upstream_rq_xx{envoy_response_code_class=\"5\"}[5m]))", "legendFormat": "5xx/s"}],
+      "fieldConfig": {"defaults": {"unit": "reqps", "color": {"mode": "fixed", "fixedColor": "red"}, "custom": {"fillOpacity": 10, "lineWidth": 2}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}}
+    },
+    {"id": 30, "type": "row", "title": "Identity", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 24}, "collapsed": false, "panels": []},
+    {
+      "id": 31, "type": "stat", "title": "Keycloak / Dex ready pods",
+      "gridPos": {"h": 5, "w": 12, "x": 0, "y": 25},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sum(kube_pod_status_ready{namespace=\"identity\", pod=~\"keycloak.*\", condition=\"true\"}) or vector(0)", "legendFormat": "keycloak", "instant": true},
+        {"refId": "B", "expr": "sum(kube_pod_status_ready{namespace=\"identity\", pod=~\"dex.*\", condition=\"true\"}) or vector(0)", "legendFormat": "dex", "instant": true}
+      ],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": ""}, "textMode": "value_and_name", "colorMode": "background", "graphMode": "none"},
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []}
+    },
+    {
+      "id": 32, "type": "timeseries", "title": "Identity pod restarts (1h)",
+      "gridPos": {"h": 5, "w": 12, "x": 12, "y": 25},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sum by (pod) (increase(kube_pod_container_status_restarts_total{namespace=\"identity\"}[1h]))", "legendFormat": "{{pod}}"}],
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "custom": {"fillOpacity": 10, "lineWidth": 2}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
+    },
+    {"id": 40, "type": "row", "title": "Observability stack", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 30}, "collapsed": false, "panels": []},
+    {
+      "id": 41, "type": "table", "title": "Scrape targets down",
+      "gridPos": {"h": 7, "w": 8, "x": 0, "y": 31},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "up == 0", "format": "table", "instant": true}],
+      "transformations": [{"id": "organize", "options": {"excludeByName": {"Time": true, "__name__": true, "Value": true, "container": true, "endpoint": true, "service": true}}}],
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "options": {"showHeader": true}
+    },
+    {
+      "id": 42, "type": "timeseries", "title": "Loki lines ingested / s",
+      "gridPos": {"h": 7, "w": 8, "x": 8, "y": 31},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sum(rate(loki_distributor_lines_received_total[5m]))", "legendFormat": "lines/s"}],
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"fillOpacity": 10, "lineWidth": 2}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}}
+    },
+    {
+      "id": 43, "type": "timeseries", "title": "Alloy → Loki write failures / s",
+      "gridPos": {"h": 7, "w": 8, "x": 16, "y": 31},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sum(rate(loki_write_request_duration_seconds_count{status_code!~\"2..\"}[5m])) or vector(0)", "legendFormat": "failed/s"}],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "fixed", "fixedColor": "red"}, "custom": {"fillOpacity": 10, "lineWidth": 2}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}}
+    },
+    {"id": 50, "type": "row", "title": "Alerts", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 38}, "collapsed": false, "panels": []},
+    {
+      "id": 51, "type": "alertlist", "title": "Active alerts (Alertmanager)",
+      "gridPos": {"h": 9, "w": 24, "x": 0, "y": 39},
+      "datasource": {"type": "alertmanager", "uid": "alertmanager"},
+      "options": {"viewMode": "list", "alertInstanceLabelFilter": "", "stateFilter": {"firing": true, "pending": true, "noData": false, "normal": false, "error": true}, "datasource": "Alertmanager", "showInactiveAlerts": false, "groupMode": "default", "maxItems": 20, "sortOrder": 1}
+    }
+  ]
+}

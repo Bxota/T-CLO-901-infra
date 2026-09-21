@@ -1,0 +1,178 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kubequest
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  groups:
+    - name: kubequest.recording
+      interval: 30s
+      rules:
+        # Envoy names each HTTPRoute backend cluster httproute/<ns>/<route>/rule/<n>;
+        # the env label is the namespace part.
+        - record: kq:app_requests:rate5m
+          expr: |
+            sum by (env) (
+              label_replace(
+                rate(envoy_cluster_upstream_rq_total{envoy_cluster_name=~"httproute/(app|app-stage)/laravel/.*"}[5m]),
+                "env", "$1", "envoy_cluster_name", "httproute/([^/]+)/.*"))
+        - record: kq:app_requests_5xx:ratio5m
+          expr: |
+            sum by (env) (
+              label_replace(
+                rate(envoy_cluster_upstream_rq_xx{envoy_response_code_class="5", envoy_cluster_name=~"httproute/(app|app-stage)/laravel/.*"}[5m]),
+                "env", "$1", "envoy_cluster_name", "httproute/([^/]+)/.*"))
+            / kq:app_requests:rate5m
+        - record: kq:app_requests_4xx:ratio5m
+          expr: |
+            sum by (env) (
+              label_replace(
+                rate(envoy_cluster_upstream_rq_xx{envoy_response_code_class="4", envoy_cluster_name=~"httproute/(app|app-stage)/laravel/.*"}[5m]),
+                "env", "$1", "envoy_cluster_name", "httproute/([^/]+)/.*"))
+            / kq:app_requests:rate5m
+        - record: kq:app_request_time_ms:p50
+          expr: |
+            histogram_quantile(0.50, sum by (le, env) (
+              label_replace(
+                rate(envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name=~"httproute/(app|app-stage)/laravel/.*"}[5m]),
+                "env", "$1", "envoy_cluster_name", "httproute/([^/]+)/.*")))
+        - record: kq:app_request_time_ms:p95
+          expr: |
+            histogram_quantile(0.95, sum by (le, env) (
+              label_replace(
+                rate(envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name=~"httproute/(app|app-stage)/laravel/.*"}[5m]),
+                "env", "$1", "envoy_cluster_name", "httproute/([^/]+)/.*")))
+        - record: kq:app_request_time_ms:p99
+          expr: |
+            histogram_quantile(0.99, sum by (le, env) (
+              label_replace(
+                rate(envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name=~"httproute/(app|app-stage)/laravel/.*"}[5m]),
+                "env", "$1", "envoy_cluster_name", "httproute/([^/]+)/.*")))
+
+    - name: kubequest
+      rules:
+        - alert: AppHigh5xxRate
+          expr: kq:app_requests_5xx:ratio5m > 0.05
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "More than 5% of requests to the app in {{ $labels.env }} return 5xx"
+            runbook_url: https://github.com/Bxota/T-CLO-901-infra/blob/main/docs/runbooks/05-observability.md
+        - alert: AppHighLatency
+          expr: kq:app_request_time_ms:p95 > 1000
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "p95 latency of the app in {{ $labels.env }} is above 1s"
+            runbook_url: https://github.com/Bxota/T-CLO-901-infra/blob/main/docs/runbooks/05-observability.md
+        - alert: AppReplicasUnavailable
+          expr: |
+            kube_deployment_status_replicas_available{namespace="app", deployment="laravel"}
+              < kube_deployment_spec_replicas{namespace="app", deployment="laravel"}
+          for: 5m
+          labels:
+            severity: critical
+            env: app
+          annotations:
+            summary: "Laravel in prod has fewer available replicas than desired"
+            runbook_url: https://github.com/Bxota/T-CLO-901-infra/blob/main/docs/runbooks/05-observability.md
+        - alert: AppReplicasUnavailable
+          expr: |
+            kube_deployment_status_replicas_available{namespace="app-stage", deployment="laravel"}
+              < kube_deployment_spec_replicas{namespace="app-stage", deployment="laravel"}
+          for: 5m
+          labels:
+            severity: warning
+            env: app-stage
+          annotations:
+            summary: "Laravel in stage has fewer available replicas than desired"
+            runbook_url: https://github.com/Bxota/T-CLO-901-infra/blob/main/docs/runbooks/05-observability.md
+        - alert: AppPodRestarting
+          expr: increase(kube_pod_container_status_restarts_total{namespace=~"app|app-stage"}[15m]) > 3
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.pod }} restarted more than 3 times in 15 minutes"
+            runbook_url: https://github.com/Bxota/T-CLO-901-infra/blob/main/docs/runbooks/05-observability.md
+        - alert: AppMetricsDown
+          expr: up{namespace=~"app|app-stage", job="laravel"} == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Prometheus cannot scrape /metrics of {{ $labels.namespace }}/{{ $labels.pod }}"
+            runbook_url: https://github.com/Bxota/T-CLO-901-infra/blob/main/docs/runbooks/05-observability.md
+        - alert: ArgoAppNotSynced
+          expr: argocd_app_info{sync_status!="Synced"} == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Argo CD Application {{ $labels.name }} is {{ $labels.sync_status }}"
+            runbook_url: https://github.com/Bxota/T-CLO-901-infra/blob/main/docs/runbooks/05-observability.md
+        - alert: ArgoAppDegraded
+          expr: argocd_app_info{health_status="Degraded"} == 1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Argo CD Application {{ $labels.name }} is Degraded"
+            runbook_url: https://github.com/Bxota/T-CLO-901-infra/blob/main/docs/runbooks/05-observability.md
+        - alert: CertificateExpiringSoon
+          expr: (certmanager_certificate_expiration_timestamp_seconds - time()) < 14 * 24 * 3600
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in less than 14 days"
+            runbook_url: https://github.com/Bxota/T-CLO-901-infra/blob/main/docs/runbooks/05-observability.md
+        - alert: BackupMissing
+          expr: |
+            (time() - max(kube_job_status_completion_time{namespace="app", job_name=~"laravel-mysql-backup-.*"}) > 26 * 3600)
+            or absent(kube_job_status_completion_time{namespace="app", job_name=~"laravel-mysql-backup-.*"})
+          labels:
+            severity: critical
+            env: app
+          annotations:
+            summary: "No successful MySQL backup Job in prod for more than 26 hours"
+            runbook_url: https://github.com/Bxota/T-CLO-901-infra/blob/main/docs/runbooks/05-observability.md
+        - alert: MySQLDown
+          expr: |
+            max by (namespace) (kube_pod_status_ready{namespace=~"app|app-stage", pod=~"mysql-.*", condition="true"}) == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "MySQL in {{ $labels.namespace }} has no Ready pod"
+            runbook_url: https://github.com/Bxota/T-CLO-901-infra/blob/main/docs/runbooks/05-observability.md
+        - alert: NodeNotReady
+          expr: kube_node_status_condition{condition="Ready", status="true"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Node {{ $labels.node }} is not Ready"
+            runbook_url: https://github.com/Bxota/T-CLO-901-infra/blob/main/docs/runbooks/05-observability.md
+        - alert: NodeDiskPressure
+          expr: kube_node_status_condition{condition="DiskPressure", status="true"} == 1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Node {{ $labels.node }} reports DiskPressure"
+            runbook_url: https://github.com/Bxota/T-CLO-901-infra/blob/main/docs/runbooks/05-observability.md
+        - alert: PrometheusTargetDown
+          expr: up{namespace=~"monitoring|app|app-stage|argocd|envoy-gateway-system|cert-manager"} == 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Scrape target {{ $labels.job }} in {{ $labels.namespace }} is down"
+            runbook_url: https://github.com/Bxota/T-CLO-901-infra/blob/main/docs/runbooks/05-observability.md

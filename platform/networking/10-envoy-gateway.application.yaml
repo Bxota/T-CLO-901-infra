@@ -16,6 +16,12 @@ spec:
       values: |
         crds:
           enabled: true
+        config:
+          envoyGateway:
+            telemetry:
+              metrics:
+                prometheus:
+                  disable: false
   destination:
     server: https://kubernetes.default.svc
     namespace: envoy-gateway-system

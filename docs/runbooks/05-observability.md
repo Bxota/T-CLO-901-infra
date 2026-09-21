@@ -72,3 +72,43 @@ This local `admin` login is temporary — spec 4 wires Dex/OIDC as the real logi
 | No logs for a given namespace in Loki | Confirm the Alloy DaemonSet has a `Running` pod on every node, including the control-plane node (`kubectl -n monitoring get pods -l app.kubernetes.io/name=alloy -o wide`); its toleration must match the control-plane taint exactly. |
 | `HTTPRoute` not accepted | Run `kubectl -n <namespace> describe httproute <name>`; verify the exact `https` parent reference and that the backend Service name/port match Tasks 3/5. |
 | Loki pod `CrashLoopBackOff`, logs show `compactor.delete-request-store should be configured when retention is enabled` | `retention_enabled: true` requires `delete_request_store` to also be set. Confirm `platform/observability/30-loki.application.yaml`'s `loki.compactor` block sets both keys. |
+
+## Dashboards
+
+Folder **KubeQuest** in Grafana, provisioned from `platform/observability/dashboards/*.json` through ConfigMaps labelled `grafana_dashboard: "1"` (kustomize `configMapGenerator`). Edit the JSON in Git, never in the Grafana UI (the sidecar overwrites UI edits).
+
+| Dashboard | uid | Answers |
+| --- | --- | --- |
+| App overview | `kq-app-overview` | Which version runs in `$env`, is it serving (Envoy req/s, 4xx/5xx, latency), business counter, resources, logs |
+| Platform health | `kq-platform-health` | Argo CD sync/health, certificate expiry, gateway, identity pods, scrape targets down, active alerts |
+| Cluster nodes | `kq-cluster-nodes` | Per-node CPU/memory/disk/pods/conditions, cluster requests vs allocatable, PVC usage |
+
+## Alert rules
+
+`PrometheusRule` `kubequest` (`platform/observability/70-alert-rules.yaml`). Alerts are visible in Grafana → Alerting and in the Platform health dashboard; Alertmanager is not exposed publicly.
+
+| Alert | Meaning | First checks |
+| --- | --- | --- |
+| AppHigh5xxRate | > 5 % of app responses are 5xx in `env` | Loki panel "5xx responses", `kubectl -n <env> logs deploy/laravel`, MySQL Ready? |
+| AppHighLatency | p95 > 1 s | SQL p95 panel, MySQL CPU, node pressure |
+| AppReplicasUnavailable | fewer Ready replicas than desired | `kubectl -n <env> describe pod`; a failing readiness probe after a rollout means the new version is broken and the old pods still serve |
+| AppPodRestarting | > 3 restarts in 15 min | `kubectl -n <env> logs --previous` |
+| AppMetricsDown | `/metrics` unreachable | `kubectl -n <env> exec deploy/laravel -- curl -s localhost/metrics`; APCu loaded? (`php -m`) |
+| ArgoAppNotSynced / ArgoAppDegraded | drift or failed sync | `kubectl -n argocd get application <name> -o yaml`, Argo CD UI |
+| CertificateExpiringSoon | < 14 days | `kubectl -n envoy-gateway-system describe certificate <name>`; ClusterIssuer status |
+| BackupMissing | no successful backup Job in 26 h | `kubectl -n app get jobs -l app.kubernetes.io/component=mysql-backup`, EFS mount |
+| MySQLDown | no Ready MySQL pod | `kubectl -n <env> describe pod mysql-0`, PVC bound? |
+| NodeNotReady / NodeDiskPressure | node condition | `kubectl describe node <node>`, `df -h` on the node |
+| PrometheusTargetDown | a scrape target is down | Platform health → "Scrape targets down"; Service labels vs monitor selector |
+
+Upstream kube-prometheus-stack rules that cannot apply to k3s (embedded controller-manager, scheduler, proxy, etcd) are switched off by disabling their scrape jobs; overcommit alerts are disabled through `defaultRules.disabled`.
+
+## Troubleshooting metrics sources
+
+| Symptom | Checks and corrective action |
+| --- | --- |
+| A `ServiceMonitor` has no target | Prometheus selects every monitor (`*SelectorNilUsesHelmValues: false`); check the Service labels match `spec.selector` and the port **name** matches `endpoints[].port`; `kubectl -n monitoring logs prometheus-kube-prometheus-stack-prometheus-0 -c prometheus | grep -i error`. |
+| No Envoy metrics | `kubectl -n envoy-gateway-system get envoyproxy public-proxy -o yaml` shows `telemetry.metrics.prometheus`; proxy pods restarted after the change; PodMonitor port name is `metrics` (or `targetPort: 19001`). |
+| Dashboard missing in Grafana | ConfigMap has label `grafana_dashboard: "1"` and lives in `monitoring`; `kubectl -n monitoring logs deploy/kube-prometheus-stack-grafana -c grafana-sc-dashboard`; JSON valid (`scripts/check-dashboards.sh`). |
+| Alert list panel shows a datasource error | Datasource `Alertmanager` (uid `alertmanager`) exists in Grafana → Connections; URL `kube-prometheus-stack-alertmanager.monitoring.svc.cluster.local:9093`. |
+| `promtool check rules` fails in CI | Fix the expression locally: `kustomize build platform/observability | yq 'select(.kind == "PrometheusRule") | .spec' > /tmp/r.yaml && promtool check rules /tmp/r.yaml`. |

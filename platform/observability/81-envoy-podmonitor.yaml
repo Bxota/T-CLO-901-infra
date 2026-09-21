@@ -1,0 +1,24 @@
+# The proxy pods have no Service for their admin/stats port, so a PodMonitor
+# scrapes the Prometheus stats endpoint directly (port 19001).
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: envoy-public-gateway
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  namespaceSelector:
+    matchNames: [envoy-gateway-system]
+  selector:
+    matchLabels:
+      gateway.envoyproxy.io/owning-gateway-name: public-gateway
+      gateway.envoyproxy.io/owning-gateway-namespace: envoy-gateway-system
+  # If the envoy container port is unnamed on the cluster, replace "port: metrics" with "targetPort: 19001".
+  podMetricsEndpoints:
+    - port: metrics
+      path: /stats/prometheus
+      interval: 30s
