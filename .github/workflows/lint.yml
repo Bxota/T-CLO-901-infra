@@ -14,7 +14,7 @@ jobs:
         run: |
           set -euo pipefail
           KUSTOMIZE_VERSION=5.4.3
-          curl -sSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" | tar -xz -C /usr/local/bin kustomize
+          curl -sSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" | sudo tar -xz -C /usr/local/bin kustomize
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64 && sudo chmod +x /usr/local/bin/yq
           PROM_VERSION=2.55.1
           curl -sSL "https://github.com/prometheus/prometheus/releases/download/v${PROM_VERSION}/prometheus-${PROM_VERSION}.linux-amd64.tar.gz" | tar -xz
@@ -23,7 +23,8 @@ jobs:
         run: kustomize build platform > /tmp/platform.yaml
       - name: promtool check rules
         run: |
-          yq 'select(.kind == "PrometheusRule") | .spec' /tmp/platform.yaml > /tmp/rules.yaml
-          promtool check rules /tmp/rules.yaml
+          yq -s '"/tmp/rule-" + $index' 'select(.kind == "PrometheusRule") | .spec' /tmp/platform.yaml
+          ls /tmp/rule-*.yml
+          promtool check rules /tmp/rule-*.yml
       - name: Check dashboards
         run: scripts/check-dashboards.sh

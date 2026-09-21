@@ -9,6 +9,7 @@ metadata:
     release: kube-prometheus-stack
   annotations:
     argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   namespaceSelector:
     matchNames: [argocd]
@@ -28,6 +29,7 @@ metadata:
     release: kube-prometheus-stack
   annotations:
     argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   namespaceSelector:
     matchNames: [argocd]
@@ -47,6 +49,7 @@ metadata:
     release: kube-prometheus-stack
   annotations:
     argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   namespaceSelector:
     matchNames: [argocd]
@@ -66,6 +69,7 @@ metadata:
     release: kube-prometheus-stack
   annotations:
     argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   namespaceSelector:
     matchNames: [envoy-gateway-system]
