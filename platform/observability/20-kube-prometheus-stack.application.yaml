@@ -109,6 +109,8 @@ spec:
           grafana.ini:
             server:
               root_url: https://grafana.15.224.195.86.sslip.io
+            auth:
+              disable_login_form: true
             auth.generic_oauth:
               enabled: true
               name: Dex
