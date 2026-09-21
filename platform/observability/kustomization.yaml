@@ -12,3 +12,15 @@ resources:
   - 70-alert-rules.yaml
   - 80-servicemonitors.yaml
   - 81-envoy-podmonitor.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: KubeQuest
+configMapGenerator:
+  - name: dashboard-app-overview
+    namespace: monitoring
+    files:
+      - app-overview.json=dashboards/app-overview.json

@@ -1,0 +1,192 @@
+{
+  "uid": "kq-app-overview",
+  "title": "KubeQuest / App overview",
+  "tags": ["kubequest", "app"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "editable": true,
+  "time": {"from": "now-1h", "to": "now"},
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "env",
+        "label": "Environment",
+        "type": "query",
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "query": "label_values(kube_namespace_created{namespace=~\"app|app-stage\"}, namespace)",
+        "refresh": 2,
+        "sort": 1,
+        "current": {"text": "app", "value": "app"}
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "Deployments",
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "enable": true,
+        "iconColor": "#5794F2",
+        "expr": "changes(count by (label_app_kubernetes_io_version) (kube_pod_labels{namespace=\"$env\", label_app_kubernetes_io_version!=\"\"})[5m:1m]) > 0",
+        "titleFormat": "Version change",
+        "textFormat": "{{label_app_kubernetes_io_version}}"
+      }
+    ]
+  },
+  "panels": [
+    {"id": 1, "type": "row", "title": "State", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}, "collapsed": false, "panels": []},
+    {
+      "id": 2, "type": "stat", "title": "Deployed version",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "max by (label_app_kubernetes_io_version) (kube_pod_labels{namespace=\"$env\", pod=~\"laravel-.*\"})", "legendFormat": "{{label_app_kubernetes_io_version}}", "instant": true}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": "/^label_app_kubernetes_io_version$/"}, "textMode": "name", "colorMode": "none", "graphMode": "none"},
+      "fieldConfig": {"defaults": {"unit": "none"}, "overrides": []}
+    },
+    {
+      "id": 3, "type": "stat", "title": "Replicas ready / desired",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "kube_deployment_status_replicas_available{namespace=\"$env\", deployment=\"laravel\"}", "legendFormat": "ready", "instant": true},
+        {"refId": "B", "expr": "kube_deployment_spec_replicas{namespace=\"$env\", deployment=\"laravel\"}", "legendFormat": "desired", "instant": true}
+      ],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": ""}, "textMode": "value_and_name", "colorMode": "value", "graphMode": "none"},
+      "fieldConfig": {"defaults": {"unit": "none", "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []}
+    },
+    {
+      "id": 4, "type": "stat", "title": "Container restarts (1h)",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"$env\"}[1h]))", "instant": true}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": ""}, "textMode": "value", "colorMode": "value", "graphMode": "none"},
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1}, {"color": "red", "value": 3}]}}, "overrides": []}
+    },
+    {
+      "id": 5, "type": "stat", "title": "Time since last rollout",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 1},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "time() - max(kube_pod_start_time{namespace=\"$env\", pod=~\"laravel-.*\"})", "instant": true}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": ""}, "textMode": "value", "colorMode": "none", "graphMode": "none"},
+      "fieldConfig": {"defaults": {"unit": "s"}, "overrides": []}
+    },
+    {"id": 10, "type": "row", "title": "Traffic (Envoy Gateway)", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 5}, "collapsed": false, "panels": []},
+    {
+      "id": 11, "type": "timeseries", "title": "Requests / s",
+      "gridPos": {"h": 7, "w": 8, "x": 0, "y": 6},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "kq:app_requests:rate5m{env=\"$env\"}", "legendFormat": "req/s"}],
+      "fieldConfig": {"defaults": {"unit": "reqps", "color": {"mode": "palette-classic"}, "custom": {"fillOpacity": 10, "lineWidth": 2}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "id": 12, "type": "timeseries", "title": "Error share",
+      "gridPos": {"h": 7, "w": 8, "x": 8, "y": 6},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "kq:app_requests_4xx:ratio5m{env=\"$env\"}", "legendFormat": "4xx"},
+        {"refId": "B", "expr": "kq:app_requests_5xx:ratio5m{env=\"$env\"}", "legendFormat": "5xx"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "custom": {"fillOpacity": 10, "lineWidth": 2}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 0.05}]}}, "overrides": [
+        {"matcher": {"id": "byName", "options": "5xx"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}]},
+        {"matcher": {"id": "byName", "options": "4xx"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "orange"}}]}
+      ]},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "id": 13, "type": "timeseries", "title": "Latency",
+      "gridPos": {"h": 7, "w": 8, "x": 16, "y": 6},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "kq:app_request_time_ms:p50{env=\"$env\"}", "legendFormat": "p50"},
+        {"refId": "B", "expr": "kq:app_request_time_ms:p95{env=\"$env\"}", "legendFormat": "p95"},
+        {"refId": "C", "expr": "kq:app_request_time_ms:p99{env=\"$env\"}", "legendFormat": "p99"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "ms", "custom": {"fillOpacity": 0, "lineWidth": 2}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1000}]}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
+    },
+    {"id": 20, "type": "row", "title": "Business (Laravel)", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 13}, "collapsed": false, "panels": []},
+    {
+      "id": 21, "type": "stat", "title": "Counter value",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 14},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "max(app_counter_total{namespace=\"$env\"})", "instant": true}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "fields": ""}, "textMode": "value", "colorMode": "none", "graphMode": "area"},
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 0}, "overrides": []}
+    },
+    {
+      "id": 22, "type": "timeseries", "title": "/counter/add per minute",
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 14},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sum(rate(app_http_requests_total{namespace=\"$env\", route=\"api/counter/add\"}[5m])) * 60", "legendFormat": "adds/min"}],
+      "fieldConfig": {"defaults": {"unit": "none", "custom": {"fillOpacity": 20, "lineWidth": 2}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}}
+    },
+    {
+      "id": 23, "type": "timeseries", "title": "p95 request duration per route (Laravel)",
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 14},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by (le, route) (rate(app_http_request_duration_seconds_bucket{namespace=\"$env\"}[5m])))", "legendFormat": "{{route}}"}],
+      "fieldConfig": {"defaults": {"unit": "s", "custom": {"fillOpacity": 0, "lineWidth": 2}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "id": 24, "type": "timeseries", "title": "p95 SQL query duration",
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 14},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(app_db_query_duration_seconds_bucket{namespace=\"$env\"}[5m])))", "legendFormat": "p95"}],
+      "fieldConfig": {"defaults": {"unit": "s", "custom": {"fillOpacity": 0, "lineWidth": 2}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}}
+    },
+    {"id": 30, "type": "row", "title": "Resources", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 20}, "collapsed": false, "panels": []},
+    {
+      "id": 31, "type": "timeseries", "title": "CPU per pod (cores) vs limit",
+      "gridPos": {"h": 7, "w": 8, "x": 0, "y": 21},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$env\", container=\"laravel\"}[5m]))", "legendFormat": "{{pod}}"},
+        {"refId": "B", "expr": "max(kube_pod_container_resource_limits{namespace=\"$env\", container=\"laravel\", resource=\"cpu\"})", "legendFormat": "limit"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "none", "decimals": 3, "custom": {"fillOpacity": 0, "lineWidth": 2}}, "overrides": [{"matcher": {"id": "byName", "options": "limit"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}, {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}]}]},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "id": 32, "type": "timeseries", "title": "Memory per pod vs limit",
+      "gridPos": {"h": 7, "w": 8, "x": 8, "y": 21},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"$env\", container=\"laravel\"})", "legendFormat": "{{pod}}"},
+        {"refId": "B", "expr": "max(kube_pod_container_resource_limits{namespace=\"$env\", container=\"laravel\", resource=\"memory\"})", "legendFormat": "limit"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "bytes", "custom": {"fillOpacity": 0, "lineWidth": 2}}, "overrides": [{"matcher": {"id": "byName", "options": "limit"}, "properties": [{"id": "color", "value": {"mode": "fixed", "fixedColor": "red"}}, {"id": "custom.lineStyle", "value": {"fill": "dash", "dash": [10, 10]}}]}]},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "id": 33, "type": "timeseries", "title": "Network per pod",
+      "gridPos": {"h": 7, "w": 8, "x": 16, "y": 21},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sum by (pod) (rate(container_network_receive_bytes_total{namespace=\"$env\", pod=~\"laravel-.*\"}[5m]))", "legendFormat": "rx {{pod}}"},
+        {"refId": "B", "expr": "- sum by (pod) (rate(container_network_transmit_bytes_total{namespace=\"$env\", pod=~\"laravel-.*\"}[5m]))", "legendFormat": "tx {{pod}}"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "Bps", "custom": {"fillOpacity": 10, "lineWidth": 1}}, "overrides": []},
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}}
+    },
+    {"id": 40, "type": "row", "title": "Logs (Loki)", "gridPos": {"h": 1, "w": 24, "x": 0, "y": 28}, "collapsed": false, "panels": []},
+    {
+      "id": 41, "type": "logs", "title": "Laravel / Apache logs",
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 29},
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [{"refId": "A", "expr": "{namespace=\"$env\", container=\"laravel\"}"}],
+      "options": {"showTime": true, "wrapLogMessage": true, "sortOrder": "Descending", "dedupStrategy": "none", "enableLogDetails": true}
+    },
+    {
+      "id": 42, "type": "logs", "title": "5xx responses in access log",
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 29},
+      "datasource": {"type": "loki", "uid": "loki"},
+      "targets": [{"refId": "A", "expr": "{namespace=\"$env\", container=\"laravel\"} |~ \"\\\" 5[0-9]{2} \""}],
+      "options": {"showTime": true, "wrapLogMessage": true, "sortOrder": "Descending", "dedupStrategy": "none", "enableLogDetails": true}
+    }
+  ]
+}
