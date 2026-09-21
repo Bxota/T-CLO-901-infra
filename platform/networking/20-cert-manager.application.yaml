@@ -19,6 +19,12 @@ spec:
         config:
           gatewayAPI:
             enabled: true
+        prometheus:
+          enabled: true
+          servicemonitor:
+            enabled: true
+            namespace: cert-manager
+            interval: 60s
   destination:
     server: https://kubernetes.default.svc
     namespace: cert-manager

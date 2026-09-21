@@ -9,3 +9,5 @@ resources:
   - 40-alloy.application.yaml
   - 50-headlamp.application.yaml
   - 60-routes.yaml
+  - 80-servicemonitors.yaml
+  - 81-envoy-podmonitor.yaml
