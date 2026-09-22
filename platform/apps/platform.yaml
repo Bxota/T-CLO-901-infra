@@ -7,13 +7,10 @@ spec:
   project: default
   source:
     repoURL: https://github.com/Bxota/T-CLO-901-infra.git
-    targetRevision: main
+    targetRevision: v1.0.0
     path: platform
   destination:
     server: https://kubernetes.default.svc
   syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [CreateNamespace=true]
