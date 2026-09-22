@@ -32,6 +32,11 @@
         version: main
         force: true
 
+    - name: Retire the legacy app owner without deleting workloads
+      ansible.builtin.command: >
+        k3s kubectl -n argocd delete application app
+        --cascade=orphan --ignore-not-found=true
+
     - name: Apply the root Argo CD Application
       ansible.builtin.command: k3s kubectl apply -f /tmp/T-CLO-901-infra-bootstrap/argocd/apps/root.yaml
 
