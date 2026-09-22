@@ -29,6 +29,10 @@ jobs:
             sed -i -E "0,/^    targetRevision: v[0-9]+\.[0-9]+\.[0-9]+$/s//    targetRevision: ${RELEASE_TAG}/" platform/apps/platform.yaml
             grep -q "^    targetRevision: ${RELEASE_TAG}$" platform/apps/platform.yaml
             git add platform/apps/platform.yaml
+            if git diff --cached --quiet; then
+              echo "platform already pinned to ${RELEASE_TAG}"
+              exit 0
+            fi
             git commit -m "chore: pin platform to ${RELEASE_TAG}"
             if git push origin HEAD:main; then exit 0; fi
             sleep 5
