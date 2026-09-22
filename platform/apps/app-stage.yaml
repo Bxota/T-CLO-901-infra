@@ -14,6 +14,8 @@ spec:
         replicaCount: 1
         route:
           host: app-stage.15.224.195.86.sslip.io
+        env:
+          APP_URL: https://app-stage.15.224.195.86.sslip.io
         efs:
           enabled: false
         backup:
@@ -22,6 +24,7 @@ spec:
           primary:
             persistence:
               storageClass: local-path
+              selector: null
         sealedSecrets:
           mysqlCredentials:
             encryptedData: {app-key: AgARc3c+zHQMK1qU+eq/M02p475q4nq0kY5TA7p9yJTDCqWxtbjumYjJg7vHWVPF2/MuMKWWa7yo+04CBnGIKnrBF+Nb2UATWQAL6HeNg1xFZkXE4m6gP5mh3kid9o1mWupWC8BhSboog5p3z7Wg9Q0P8e89zh7mWoWdoOh4EYNVSPkPqOZg2ku+JavhBzXin3PdQ6s7VXl/WIFGIPLk3LLuM6SGq9ucomOb3xG0jQPDHIFAeAWLE691ZMk6cQYhsFWgMoR+iPyQ6A9ZEmu8lP80zx1K49pa+hRWb8qKJF5nejujOTRKrGVka39Hr1ud0ksWN1aC40cjluqE1q7uOzDgS7oUNfuc0Nm0H9wXG4joQw3RWOen5omgRKYOdGQDWyHMNhElba635ivRDyAFmkVxthmc/c1ZDvc+bBBTgPBXlv9mCjvJmiHCfU5C6BuGxbBHZWmOsFi95vv6/wdSOCnHQJabs2D8kExUhHPMBrqDqwcO8xxJyIWFzRKnD7hv7BTWit066LpZbTLeKD8NkGwrcECx/7mbULgjfTizoovKXSWPhQ0fhtAS6AYKSlQgJfx+SvfRTjW1OdEpRmRAixLdoy67QAaplEGulZcqlTi9haACyYmfJhGmVF8KMvwJxwGUwKyT6lc3eHUUkuqZ0XAW01ePISgJK0ahHm4z3Ww1W2xw8JDV0aKT7Q/bx3gCsvxB+kVMpxOU7HIR+5wIifDkZap40dClbyR9mg3P3ZXL/Xo9FkjV+BzB4Jau561ke/8sGZI=, mysql-password: AgARBqSxjOVnZP0JKUeUNMr9YjA5v6xCxwGCA83sBRH1Sd5iE0AtbwammYxbaxKLkZB9VKYtNlGddw3QyX9zZzfKSobFjBbWAd+gr6c6K9oOz/2Yls6TqDlSoWggoxWRvrxQ2XB8OqzPl4Oq+Q8Ko8o10dodOQmI052OH9oEnlAtitoC/euNfU8kYC5SxrK2zDiw05y900elcgjskFpfMNKOrJnC+bY+d9qkE0E/8nax7Wgw+U/zsNmYWIZE2OLDc28nl7Jy3+CBRDKFffkwKNCd65hQctXxlS0u3T+vb13I0kgRSEvbI90M8iVJKvEciZ3c9Rrk31Pl4Xch9YeohK+a6XJtb5+qoSsKNecTs2FSC9m95DW2qLvzOrleL78aZZpMus5Y3ZLv/y24o9YWXATGXqtfhU2pKuHeTvmZLPVan73AmIDixK3TKxKDulenIBw7Eu3l4QBjrwowdfqMSGhnwTEc1Di8OaL77jR4F0kncdjbh+qwtZ712kQjEQG5Qo5gvOWtqutEF3cUE6RH+TCKLOb8TIhJr5kkLzc1xvvcC+LJRNscnH84XXsWsAZVQOE2mxqO3tEY8D++ZoQe1giTxnVdrCVZQiYRWpsS2wF6J/cLHWrZLglYJvglGI+7NS+nHAJ8ra4aeFlHtG67dcbjQ1BmUK0qxBLCUhu19erF0uxyiATr2fwIiw7XLj5Tae3+UN+kVdlHcaSJpX+cnZgwcb9ySn8t7PyBKbu9zcJSeWcynWgXqnuLqAqLevGTbnA=, mysql-root-password: AgB29SliWHCvUBBGjL9xzid9ejqfDCE4aZkoGko8fph6EBxgqNjdVAY3Yl7jmubWktqGo6XWXcXzIzwC/PEJB6RjX8vMV4GxR1JPfIHUsLVqVFzL2OAxqjq27P8KyK0S2jW7Odclh/3yj+iCIOW5M2Frblexg6mCsFJn9pBGn8MXBwE4PVfCVwOggtGUnw/Ua7t09/9fGnsJIoffAvJu/xdbydc1O5GsKrAGR1zAaZgtKXP6Qw1oE5pk0vjLA4WwO4HNRSWX6maIFWM2hIFkY6FCqE6IYzGghEIWeqp6Mn9nhAtOK7dTtMvKQFPvHG5KtOVyuiaMNBOW6UTe8+Df0oB5+ZnDKfWtnx9Otcn87ITe49wWyH7K8ls5M3DtzabkH87XmLE3aA6CrSRnqtZFeKRmxYETW9who9Ex1HqHBcp2sUkejjyKVvroQxm2gz2Z/gpSOWR2r4YbxGL/IlbnMubSAA1WejAwLFuSwm8nMi2zhNO/G+GqYqvlbqzPJ/r3hfIIOy04X86qKAVfvrgoAPyn1xfaTk8pzRq4+l2CLUpxLTINRB6xgPUAEhzh6665dUjDlRKlhXNBz/tWyKX7fBwo7zeJpjTgSUYM07Bwb42o9VD+jVHWahfkvb3Z9xSMQWlkrwFC1ggOTKgVeWryEm4RPMPLFBtlve7VfXJ9Cl5MThEb+0gmMByLiIaX4yb6ybNZ5MA0YGm0oteDMWPoLm+k1v4JxXv29gVeIUUWONZfQkujRZr7LnkYEE9OPOO1A+E=}

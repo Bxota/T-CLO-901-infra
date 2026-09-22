@@ -6,6 +6,8 @@ Work on \`dev\`, then merge a Conventional Commit pull request into protected \`
 
 Run the \`promote\` workflow with an rc tag, or leave the input empty to select the highest rc. Promotion retags the tested image digest, packages the chart from the rc commit, and creates the stable \`vX.Y.Z\` tag and release. It never rebuilds the image.
 
+The first bootstrap after migrating from the legacy \`Application/app\` must run the retirement step in \`playbooks/argocd-bootstrap.yml\` before the root Application is applied. It deletes only the legacy Argo CD owner with \`--cascade=orphan\`, preserving its workloads while \`app-prod\` becomes the sole owner. Do not apply \`app-prod\` first: that would create two automated owners for the same resources.
+
 ## Platform releases
 
 After reviewing platform changes, create an infra tag manually:
@@ -32,4 +34,3 @@ For prod or stage, replace that child Application's chart range with an exact ve
 ## Defence sequence
 
 Merge \`feat: break readiness probe\` and observe \`v1.1.0-rc.1\) in stage while old pods keep serving. Merge \`fix: restore readiness probe\`, promote \`v1.1.0-rc.2\), then verify prod and demonstrate rollback by pinning prod to \`1.0.0\`.
-
