@@ -10,6 +10,9 @@ spec:
     chart: laravel
     targetRevision: ">=1.0.0"
     helm:
+      # The legacy Application/app deployed this chart with release name
+      # "app"; selectors carry app.kubernetes.io/instance and are immutable.
+      releaseName: app
       valuesObject:
         replicaCount: 2
         route:
