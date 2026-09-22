@@ -32,8 +32,8 @@
         version: main
         force: true
 
-    - name: Apply the root Argo CD Applications
-      ansible.builtin.command: k3s kubectl apply -f /tmp/T-CLO-901-infra-bootstrap/argocd/apps/
+    - name: Apply the root Argo CD Application
+      ansible.builtin.command: k3s kubectl apply -f /tmp/T-CLO-901-infra-bootstrap/argocd/apps/root.yaml
 
     - name: Check current argocd-server insecure setting
       ansible.builtin.shell: >

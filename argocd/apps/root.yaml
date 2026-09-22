@@ -1,20 +1,18 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: app
+  name: root
   namespace: argocd
 spec:
   project: default
   source:
-    repoURL: https://github.com/Bxota/T-CLO-901-app.git
+    repoURL: https://github.com/Bxota/T-CLO-901-infra.git
     targetRevision: main
-    path: charts/laravel
+    path: platform/apps
   destination:
     server: https://kubernetes.default.svc
-    namespace: app
+    namespace: argocd
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
-    syncOptions:
-      - CreateNamespace=true

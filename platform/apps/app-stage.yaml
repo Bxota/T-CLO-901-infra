@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-stage
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: ghcr.io/bxota/charts
+    chart: laravel
+    targetRevision: ">=1.0.0-0"
+    helm:
+      valuesObject:
+        replicaCount: 1
+        route:
+          host: app-stage.15.224.195.86.sslip.io
+        efs:
+          enabled: false
+        backup:
+          enabled: false
+        mysql:
+          primary:
+            persistence:
+              storageClass: local-path
+        sealedSecrets:
+          mysqlCredentials:
+            encryptedData: {app-key: stage-sealed, mysql-password: stage-sealed, mysql-root-password: stage-sealed}
+          ghcrPullSecret:
+            encryptedData: {'.dockerconfigjson': stage-sealed}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: app-stage
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [CreateNamespace=true]

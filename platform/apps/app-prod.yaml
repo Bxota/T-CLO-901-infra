@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-prod
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: ghcr.io/bxota/charts
+    chart: laravel
+    targetRevision: ">=1.0.0"
+    helm:
+      valuesObject:
+        replicaCount: 2
+        route:
+          host: app.15.224.195.86.sslip.io
+        efs: {enabled: true}
+        backup: {enabled: true}
+        sealedSecrets:
+          mysqlCredentials:
+            encryptedData: {app-key: prod-sealed, mysql-password: prod-sealed, mysql-root-password: prod-sealed}
+          ghcrPullSecret:
+            encryptedData: {'.dockerconfigjson': prod-sealed}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: app
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [CreateNamespace=true]
