@@ -15,6 +15,13 @@ for f in "${files[@]}"; do
   uids+=("$uid")
   missing=$(jq -r '[.panels[] | select(.type != "row") | select((.datasource // null) == null or (.title // "") == "") | .id] | length' "$f")
   [ "$missing" = "0" ] || { echo "$missing panel(s) without datasource or title: $f" >&2; exit 1; }
+  # Multi-value / includeAll variables are interpolated regex-escaped
+  # (ip-10-0-0-1\.eu-west-3...), so an equality matcher on them never matches.
+  multi=$(jq -r '[.templating.list[]? | select(.multi == true or .includeAll == true) | .name] | join(" ")' "$f")
+  for v in $multi; do
+    bad=$(jq -r --arg v "$v" '[.. | objects | .expr? // empty | select(test("[a-zA-Z_]+\\s*=\\s*\"\\$(\\{)?" + $v + "\\b"))] | length' "$f")
+    [ "$bad" = "0" ] || { echo "$bad query(ies) use label=\"\$$v\" on multi-value variable \$$v; use =~ instead: $f" >&2; exit 1; }
+  done
   echo "ok: $f ($uid)"
 done
 dupes=$(printf '%s\n' "${uids[@]}" | sort | uniq -d)
