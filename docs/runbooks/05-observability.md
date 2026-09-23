@@ -106,7 +106,7 @@ Test end to end after the sync (a test alert appears in the channel within `grou
 kubectl -n monitoring get secret alertmanager-discord
 kubectl -n monitoring exec alertmanager-kube-prometheus-stack-alertmanager-0 -- amtool check-config /etc/alertmanager/config_out/alertmanager.env.yaml
 kubectl -n monitoring exec alertmanager-kube-prometheus-stack-alertmanager-0 -- \
-  amtool alert add DiscordTest severity=warning env=test --annotation=summary="Alertmanager to Discord test" --alertmanager.url=http://127.0.0.1:9093
+  amtool alert add DiscordTest severity=warning env=test --annotation='summary="Alertmanager to Discord test"' --alertmanager.url=http://127.0.0.1:9093
 ```
 
 Rotation: seal the new URL under the same name, commit; Alertmanager re-reads the mounted file on its next notification, no restart needed. Revoke the old webhook in Discord afterwards.
