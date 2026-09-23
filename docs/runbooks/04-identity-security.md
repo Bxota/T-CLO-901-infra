@@ -46,11 +46,11 @@ Dex passes through the `email` and `groups` claims from Keycloak. The tools cons
 | Tool | Identity | `platform-admin` | `developer` | `viewer` | Local login |
 | --- | --- | --- | --- | --- | --- |
 | Kubernetes API | user `oidc:<email>`, groups `oidc:<group>` | `cluster-admin` | `edit` | `view` | none (certificates only via the k3s kubeconfig on `kube-1`) |
-| Argo CD | `policy.csv` on `groups` | `role:admin` | `role:edit` (see note) | `role:readonly` (also the default) | `admin` account disabled |
+| Argo CD | `policy.csv` on `groups` | `role:admin` | `role:edit` (readonly + sync, actions, override, logs) | `role:readonly` (also the default) | `admin` account disabled |
 | Grafana | `role_attribute_path` on `groups` | `GrafanaAdmin` | `Editor` | `Viewer` | login form disabled |
 | Headlamp | the user's own ID token is sent to the API | Kubernetes RBAC applies as above | | | none |
 
-Note on `role:edit`: Argo CD ships only `role:admin` and `role:readonly`. `role:edit` is referenced by `argocd-rbac-cm` but never defined, so `bob-dev` currently gets the default `role:readonly`. Defining the role (a few `p, role:edit, applications, sync, ...` lines) is tracked as a follow-up in the coordination repo's `TODO.md`.
+Argo CD ships only `role:admin` and `role:readonly`; `role:edit` is defined in `playbooks/files/argocd-rbac-cm-patch.yaml` as readonly plus `applications sync`, `applications action/*`, `applications override` and `logs get`. It is applied by `identity-bootstrap.yml`; after changing the patch file, re-run the play (or apply the patch by hand, see Update the realm or the Argo CD policy below).
 
 ## Demo accounts
 
@@ -62,9 +62,9 @@ Defined in the realm export and created at Keycloak startup:
 | `bob-dev` | `bob-dev@kubequest2.local` | `developer` |
 | `carol-view` | `carol-view@kubequest2.local` | `viewer` |
 
-Their initial passwords are in `kubequest2-realm.json.j2` and are flagged `temporary: true`: Keycloak forces a password change at the first login. Do this for all three accounts before the defence, not during it.
+Their passwords are the ones in `kubequest2-realm.json.j2`, with `temporary: false`, and each user carries a first and last name. Both matter because Keycloak state is **ephemeral**: the chart values configure no database and no persistent volume, so the realm is re-imported from the Secret on every Keycloak pod start, which happens at least once a day with the nightly VM shutdown. Anything changed through the Keycloak UI (a password, a profile) is lost at the next start; the realm export in Git is the only durable source. Before this fix the users had temporary passwords and no names, so every morning Keycloak asked again for a new password and for first/last name.
 
-Keycloak state is ephemeral in the current values (no database configured for the chart, no persistent volume): the realm is re-imported on every Keycloak pod start, which resets passwords changed at first login. After any Keycloak restart, redo the first-login password change. Verify this behaviour once on the live cluster; if it becomes a problem for the defence, giving Keycloak a PostgreSQL or a PVC is a platform change, not a runbook step.
+If durable self-service accounts ever become a requirement, giving Keycloak a PostgreSQL is a platform change, not a runbook step.
 
 The Keycloak admin console is at `https://keycloak.15.224.195.86.sslip.io/admin/`, user `admin`, password in Secret `identity/keycloak-admin`:
 
@@ -73,6 +73,49 @@ kubectl -n identity get secret keycloak-admin -o jsonpath='{.data.password}' | b
 ```
 
 Use it only to inspect; realm changes go through the template and a re-seal, never through the console.
+
+## Update the realm or the Argo CD policy
+
+The realm export is a SealedSecret whose plaintext contains Keycloak's `dex` client secret, so a template change is a re-seal, not a plain commit. Steps:
+
+1. Edit `playbooks/templates/kubequest2-realm.json.j2` and open the PR.
+2. On `kube-1`, read the current `dex` client secret out of the live realm Secret (never print it into a shared terminal recording):
+
+   ```bash
+   sudo k3s kubectl -n identity get secret keycloak-realm-config -o jsonpath='{.data.kubequest2-realm\.json}' | base64 -d | jq -r '.clients[] | select(.clientId=="dex") | .secret'
+   ```
+
+3. On the workstation, render the template with that value and seal it (same name and namespace, strict scope):
+
+   ```bash
+   read -rs DEX_CLIENT_SECRET
+   sed "s/{{ dex_client_secret }}/${DEX_CLIENT_SECRET}/" playbooks/templates/kubequest2-realm.json.j2 > /tmp/kubequest2-realm.json
+   jq -e . /tmp/kubequest2-realm.json >/dev/null
+   kubectl create secret generic keycloak-realm-config --namespace identity --from-file=kubequest2-realm.json=/tmp/kubequest2-realm.json --dry-run=client -o yaml \
+     | kubeseal --cert sealed-secrets/pub-cert.pem --format yaml > platform/identity/sealed/keycloak-realm-config.sealedsecret.yaml
+   yq -i '.metadata.annotations["argocd.argoproj.io/sync-wave"] = "-1" | .metadata.annotations["argocd.argoproj.io/sync-options"] = "SkipDryRunOnMissingResource=true"' platform/identity/sealed/keycloak-realm-config.sealedsecret.yaml
+   rm -f /tmp/kubequest2-realm.json; unset DEX_CLIENT_SECRET
+   git diff --cached | grep -c 'kind: Secret$'   # must print 0 after staging
+   ```
+
+4. Commit the sealed file in the same PR. After the platform tag is pinned and synced, restart Keycloak so it re-imports:
+
+   ```bash
+   sudo k3s kubectl -n identity rollout restart statefulset/keycloak-keycloakx
+   sudo k3s kubectl -n identity rollout status statefulset/keycloak-keycloakx --timeout=5m
+   ```
+
+   With `--import-realm`, Keycloak only imports a realm that does not exist yet; on this ephemeral setup every start is a fresh import, which is why the restart is enough.
+
+The Argo CD policy is not GitOps-managed: after editing `playbooks/files/argocd-rbac-cm-patch.yaml` and merging, apply it on `kube-1` with either the play or the patch directly:
+
+```bash
+cd ~/T-CLO-901-infra && git pull && sudo ansible-playbook playbooks/identity-bootstrap.yml
+# or
+sudo k3s kubectl -n argocd patch configmap argocd-rbac-cm --type merge --patch-file playbooks/files/argocd-rbac-cm-patch.yaml
+```
+
+Argo CD reloads `argocd-rbac-cm` without a restart. Check with `argocd admin settings rbac can developer sync applications '*/*' --policy-file playbooks/files/argocd-rbac-cm-patch.yaml` from a workstation with the CLI, or simply log in as `bob-dev` and press Sync.
 
 ## Bootstrap and rebuild
 
@@ -180,7 +223,7 @@ Workstation variant, **not enabled today**: it needs inbound TCP 6443 on the `ku
 
 | Tool | URL | What to show |
 | --- | --- | --- |
-| Argo CD | `https://argocd.15.224.195.86.sslip.io` | Only a "Log in via Dex" button, no username form. `alice-admin` can sync; `carol-view` sees everything read-only, `Sync` is refused. `admin` password login fails |
+| Argo CD | `https://argocd.15.224.195.86.sslip.io` | Only a "Log in via Dex" button, no username form. `alice-admin` has every action; `bob-dev` can sync but not create or delete Applications; `carol-view` sees everything read-only, `Sync` is refused. `admin` password login fails |
 | Grafana | `https://grafana.15.224.195.86.sslip.io` | Redirect straight to Dex. `alice-admin` lands as Grafana Admin (Administration menu visible), `bob-dev` as Editor, `carol-view` as Viewer |
 | Headlamp | `https://headlamp.15.224.195.86.sslip.io` | "Sign in" goes to Dex. `carol-view` can list but the Delete action is refused by the API (Headlamp uses the user's own token) |
 | Keycloak | `https://keycloak.15.224.195.86.sslip.io/admin/` | Realm `kubequest2`, Groups, Users, client `dex`. Show that it is config, not clicks: the same content is in `kubequest2-realm.json.j2` |
@@ -230,7 +273,7 @@ The policy does not apply outside `app` and `app-stage` (`matchConditions`), so 
 
 ## Troubleshooting
 
-- **Keycloak login says invalid credentials for a demo user.** Passwords are temporary and reset on every Keycloak restart (see Demo accounts). Use the initial value from the template again.
+- **Keycloak login says invalid credentials for a demo user.** State is ephemeral; the only valid password is the one in the realm template. Anything changed via the UI was lost at the last restart.
 - **Dex shows "failed to connect to keycloak" / CrashLoop.** Keycloak is not Ready yet or its discovery URL is unreachable from the pod. `kubectl -n identity logs deploy/dex`, then `curl` the realm's `.well-known` from `kube-1`. Dex restarts on its own once Keycloak answers.
 - **Dex "invalid client secret" from Keycloak.** `dex-config` and `keycloak-realm-config` were generated at different times. Both must come from the same run: either the SealedSecrets pair in Git or the same execution of `identity-bootstrap.yml`. Never mix a sealed one with a regenerated one.
 - **Token accepted by Dex but `kubectl` says Unauthorized.** Check the six `oidc-*` flags in `/etc/systemd/system/k3s.service` and that the API server can reach `https://dex.15.224.195.86.sslip.io` from `kube-1`. `journalctl -u k3s | grep -i oidc` shows the verification error.
