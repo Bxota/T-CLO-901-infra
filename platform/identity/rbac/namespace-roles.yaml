@@ -1,0 +1,95 @@
+# Namespace-scoped rights, built on the Kubernetes aggregated ClusterRoles
+# edit and view so they follow API additions automatically.
+#
+#   developer: edit on app-stage, view on app and monitoring
+#   viewer:    view on app, app-stage and monitoring
+#
+# Nobody but platform-admin can write to prod (app) by hand: prod changes go
+# through Git and Argo CD.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: oidc-developer-edit
+  namespace: app-stage
+subjects:
+  - kind: Group
+    name: "oidc:developer"
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: edit
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: oidc-developer-view
+  namespace: app
+subjects:
+  - kind: Group
+    name: "oidc:developer"
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: oidc-developer-view
+  namespace: monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+subjects:
+  - kind: Group
+    name: "oidc:developer"
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: oidc-viewer-view
+  namespace: app
+subjects:
+  - kind: Group
+    name: "oidc:viewer"
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: oidc-viewer-view
+  namespace: app-stage
+subjects:
+  - kind: Group
+    name: "oidc:viewer"
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: oidc-viewer-view
+  namespace: monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+subjects:
+  - kind: Group
+    name: "oidc:viewer"
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io

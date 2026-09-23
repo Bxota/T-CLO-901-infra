@@ -22,7 +22,7 @@
 | Dex 2.44.0 (`dexidp/dex` 0.24.1) | `platform` Application, wave `1`, namespace `identity` | `config.yaml` from Secret `dex-config`: one `oidc` connector to Keycloak, four static clients | `platform/identity/dex/`, `playbooks/templates/dex-config.yaml.j2` |
 | Identity Secrets (`keycloak-admin`, `keycloak-realm-config`, `dex-config`, `argocd-dex-client`, `grafana-dex-client`, `headlamp-dex-client`) | `platform` Application, waves `-1` and `3` | SealedSecrets, unsealed by the controller from [07](07-secrets-registry.md) | `platform/identity/sealed/` |
 | Kubernetes API OIDC flags | `playbooks/server.yml` (fresh install) or `playbooks/identity-bootstrap.yml` (existing node) | `--kube-apiserver-arg=oidc-*` on k3s | `playbooks/` |
-| Group → ClusterRole bindings | `platform` Application | `oidc:platform-admin` → `cluster-admin`, `oidc:developer` → `edit`, `oidc:viewer` → `view` | `platform/identity/rbac/` |
+| Group → roles | `platform` Application | `oidc:platform-admin` → `cluster-admin`; `oidc:developer` → `edit` on `app-stage`, `view` on `app` and `monitoring`; `oidc:viewer` → `view` on `app`, `app-stage`, `monitoring`; both get a minimal cluster read (namespaces, nodes) | `platform/identity/rbac/` |
 | Argo CD OIDC + RBAC | `playbooks/identity-bootstrap.yml` (imperative patch) | `argocd-cm` `oidc.config`, `admin.enabled: "false"`; `argocd-rbac-cm` `policy.csv` | `playbooks/files/argocd-*-patch.yaml` |
 | Grafana OIDC | kube-prometheus-stack Application values | `auth.generic_oauth` against Dex, login form disabled | `platform/observability/20-kube-prometheus-stack.application.yaml` |
 | Headlamp OIDC | Headlamp Application values | `config.oidc.externalSecret` = `headlamp-dex-client` | `platform/observability/50-headlamp.application.yaml` |
@@ -45,12 +45,12 @@ Dex passes through the `email` and `groups` claims from Keycloak. The tools cons
 
 | Tool | Identity | `platform-admin` | `developer` | `viewer` | Local login |
 | --- | --- | --- | --- | --- | --- |
-| Kubernetes API | user `oidc:<email>`, groups `oidc:<group>` | `cluster-admin` | `edit` | `view` | none (certificates only via the k3s kubeconfig on `kube-1`) |
-| Argo CD | `policy.csv` on `groups` | `role:admin` | `role:edit` (readonly + sync, actions, override, logs) | `role:readonly` (also the default) | `admin` account disabled |
+| Kubernetes API | user `oidc:<email>`, groups `oidc:<group>` | `cluster-admin` | `edit` in `app-stage`, `view` in `app` and `monitoring` | `view` in `app`, `app-stage`, `monitoring` | none (certificates only via the k3s kubeconfig on `kube-1`) |
+| Argo CD | `policy.csv` on `groups` | `role:admin` | `role:edit` (readonly + sync, actions, override on `default/app-stage` only, logs everywhere) | `role:readonly` (also the default) | `admin` account disabled |
 | Grafana | `role_attribute_path` on `groups` | `GrafanaAdmin` | `Editor` | `Viewer` | login form disabled |
 | Headlamp | the user's own ID token is sent to the API | Kubernetes RBAC applies as above | | | none |
 
-Argo CD ships only `role:admin` and `role:readonly`; `role:edit` is defined in `playbooks/files/argocd-rbac-cm-patch.yaml` as readonly plus `applications sync`, `applications action/*`, `applications override` and `logs get`. It is applied by `identity-bootstrap.yml`; after changing the patch file, re-run the play (or apply the patch by hand, see Update the realm or the Argo CD policy below).
+Argo CD ships only `role:admin` and `role:readonly`; `role:edit` is defined in `playbooks/files/argocd-rbac-cm-patch.yaml` as readonly plus `applications sync`, `applications action/*` and `applications override` restricted to `default/app-stage`, and `logs get` everywhere. Production (`app-prod`) is never written by hand, neither through kubectl nor through Argo CD: it changes through Git and the `promote` workflow. It is applied by `identity-bootstrap.yml`; after changing the patch file, re-run the play (or apply the patch by hand, see Update the realm or the Argo CD policy below).
 
 ## Demo accounts
 
@@ -210,9 +210,14 @@ kubectl get nodes                                    # alice: allowed (cluster-a
 rm -rf ~/.kube/cache/oidc-login
 kubectl auth whoami                                  # log in as carol-view this time
 kubectl get pods -n app                              # allowed (view)
+kubectl get pods -n identity                         # Forbidden: viewer has no right in identity
 kubectl -n app delete pod -l app.kubernetes.io/name=laravel --dry-run=server
 # Error from server (Forbidden): ... User "oidc:carol-view@kubequest2.local" cannot delete resource "pods" ...
 kubectl auth can-i delete pods -n app                # no
+rm -rf ~/.kube/cache/oidc-login
+kubectl auth whoami                                  # bob-dev
+kubectl auth can-i delete pods -n app-stage          # yes (edit on stage)
+kubectl auth can-i delete pods -n app                # no  (view on prod)
 ```
 
 Never point this kubeconfig at the cluster-admin credentials; keep `KUBECONFIG` unset in other shells so `sudo k3s kubectl` keeps working as before.
@@ -287,6 +292,6 @@ The policy does not apply outside `app` and `app-stage` (`matchConditions`), so 
 
 1. Keycloak admin console: realm, groups, users; point at the template in Git.
 2. Argo CD, Grafana, Headlamp: log in as `alice-admin` then `carol-view`, show the role difference and that no local login exists.
-3. `kubectl auth whoami` through kubelogin on `kube-1` for both users, `auth can-i delete pods` = `no` for `carol-view`.
+3. `kubectl auth whoami` through kubelogin on `kube-1` for the three users: `auth can-i delete pods -n app` is `yes` for `alice-admin`, `no` for `bob-dev` and `carol-view`; `-n app-stage` is `yes` for `bob-dev`.
 4. `grep oidc /etc/systemd/system/k3s.service`: the API server itself is OIDC-configured, not only the tools.
 5. The three refused `kubectl run` commands against the admission policy, then the accepted control case.

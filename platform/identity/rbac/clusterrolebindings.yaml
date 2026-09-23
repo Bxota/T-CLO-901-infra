@@ -1,3 +1,7 @@
+# platform-admin keeps cluster-admin. developer and viewer no longer get a
+# cluster-wide edit/view: their rights are namespace Roles (see
+# namespace-roles.yaml) plus the minimal cluster read below, which keeps
+# Headlamp and kubectl usable (namespace and node listing).
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -12,27 +16,29 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: ClusterRole
 metadata:
-  name: oidc-developer
-subjects:
-  - kind: Group
-    name: "oidc:developer"
-    apiGroup: rbac.authorization.k8s.io
-roleRef:
-  kind: ClusterRole
-  name: edit
-  apiGroup: rbac.authorization.k8s.io
+  name: oidc-cluster-read-basics
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces", "nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["nodes", "pods"]
+    verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: oidc-viewer
+  name: oidc-cluster-read-basics
 subjects:
+  - kind: Group
+    name: "oidc:developer"
+    apiGroup: rbac.authorization.k8s.io
   - kind: Group
     name: "oidc:viewer"
     apiGroup: rbac.authorization.k8s.io
 roleRef:
   kind: ClusterRole
-  name: view
+  name: oidc-cluster-read-basics
   apiGroup: rbac.authorization.k8s.io
