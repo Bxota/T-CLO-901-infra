@@ -57,24 +57,39 @@ spec:
           metricLabelsAllowlist:
             - pods=[app.kubernetes.io/version]
         alertmanager:
+          alertmanagerSpec:
+            # Mounted at /etc/alertmanager/secrets/alertmanager-discord/; the
+            # SealedSecret lives in 15-alertmanager-discord.sealedsecret.yaml.
+            secrets:
+              - alertmanager-discord
           config:
             global:
               resolve_timeout: 5m
             route:
-              receiver: "null"
+              receiver: discord
               group_by: ["alertname", "env", "namespace"]
               group_wait: 30s
               group_interval: 5m
               repeat_interval: 12h
               routes:
+                # Watchdog always fires by design (kube-prometheus default rule);
+                # keep it out of the channel.
                 - receiver: "null"
                   matchers:
+                    - alertname = "Watchdog"
+                - receiver: discord
+                  matchers:
                     - severity = "critical"
-                - receiver: "null"
+                  repeat_interval: 4h
+                - receiver: discord
                   matchers:
                     - severity = "warning"
             receivers:
               - name: "null"
+              - name: discord
+                discord_configs:
+                  - webhook_url_file: /etc/alertmanager/secrets/alertmanager-discord/webhook-url
+                    send_resolved: true
         grafana:
           sidecar:
             dashboards:
