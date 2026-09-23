@@ -87,6 +87,30 @@ Folder **KubeQuest** in Grafana, provisioned from `platform/observability/dashbo
 
 `PrometheusRule` `kubequest` (`platform/observability/70-alert-rules.yaml`). Alerts are visible in Grafana → Alerting and in the Platform health dashboard; Alertmanager is not exposed publicly.
 
+### Notifications (Discord)
+
+Alertmanager posts every `critical` (repeated every 4 h) and `warning` (every 12 h) alert, and their resolution, to a Discord channel through a webhook. `Watchdog`, which fires permanently by design, is routed to the `null` receiver. The webhook URL is a secret: it lives in `monitoring/alertmanager-discord` (key `webhook-url`), sealed in `platform/observability/15-alertmanager-discord.sealedsecret.yaml`, and is mounted into the Alertmanager pod by `alertmanager.alertmanagerSpec.secrets`; the config only references the file path (`webhook_url_file`).
+
+Create or rotate the webhook (Discord: channel settings → Integrations → Webhooks → copy URL), then seal it from a workstation as in [07](07-secrets-registry.md#seal-a-secret-from-a-workstation):
+
+```bash
+kubectl create secret generic alertmanager-discord --namespace monitoring \
+  --from-literal=webhook-url='https://discord.com/api/webhooks/<id>/<token>' --dry-run=client -o yaml \
+  | kubeseal --cert sealed-secrets/pub-cert.pem --format yaml > platform/observability/15-alertmanager-discord.sealedsecret.yaml
+yq -i '.metadata.annotations["argocd.argoproj.io/sync-wave"] = "2" | .metadata.annotations["argocd.argoproj.io/sync-options"] = "SkipDryRunOnMissingResource=true"' platform/observability/15-alertmanager-discord.sealedsecret.yaml
+```
+
+Test end to end after the sync (a test alert appears in the channel within `group_wait`, 30 s):
+
+```bash
+kubectl -n monitoring get secret alertmanager-discord
+kubectl -n monitoring exec alertmanager-kube-prometheus-stack-alertmanager-0 -- amtool check-config /etc/alertmanager/config_out/alertmanager.env.yaml
+kubectl -n monitoring exec alertmanager-kube-prometheus-stack-alertmanager-0 -- \
+  amtool alert add DiscordTest severity=warning env=test --annotation=summary="Alertmanager to Discord test" --alertmanager.url=http://127.0.0.1:9093
+```
+
+Rotation: seal the new URL under the same name, commit; Alertmanager re-reads the mounted file on its next notification, no restart needed. Revoke the old webhook in Discord afterwards.
+
 | Alert | Meaning | First checks |
 | --- | --- | --- |
 | AppHigh5xxRate | > 5 % of app responses are 5xx in `env` | Loki panel "5xx responses", `kubectl -n <env> logs deploy/laravel`, MySQL Ready? |

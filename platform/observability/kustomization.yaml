@@ -4,6 +4,7 @@ resources:
   - 00-namespaces.yaml
   - 05-efs-bootstrap-loki.job.yaml
   - 10-loki-pv.yaml
+  - 15-alertmanager-discord.sealedsecret.yaml
   - 20-kube-prometheus-stack.application.yaml
   - 30-loki.application.yaml
   - 40-alloy.application.yaml
