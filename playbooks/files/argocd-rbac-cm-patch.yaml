@@ -2,10 +2,11 @@ data:
   policy.csv: |
     # role:edit is not built into Argo CD (only role:admin and role:readonly are):
     # everything readonly can do, plus sync, resource actions and manual overrides.
+    # Scoped to the stage Application: prod changes go through Git only.
     g, role:edit, role:readonly
-    p, role:edit, applications, sync, */*, allow
-    p, role:edit, applications, action/*, */*, allow
-    p, role:edit, applications, override, */*, allow
+    p, role:edit, applications, sync, default/app-stage, allow
+    p, role:edit, applications, action/*, default/app-stage, allow
+    p, role:edit, applications, override, default/app-stage, allow
     p, role:edit, logs, get, */*, allow
     g, platform-admin, role:admin
     g, developer, role:edit
