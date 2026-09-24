@@ -59,7 +59,7 @@ def main():
                 if kind in ("Deployment", "StatefulSet", "DaemonSet"):
                     pod = spec["template"]["spec"]
                     if any(c["name"] == "keycloak" for c in pod["containers"]):
-                        assert spec.get("updateStrategy", {}).get("type") == "OnDelete", "Do not recreate the ephemeral Keycloak database automatically"
+                        assert spec.get("updateStrategy", {}).get("type") == "OnDelete", "Do not recreate the ephemeral Keycloak database automatically (see docs/runbooks/worker-memory.md)"
                     for container in pod["containers"]:
                         name = container["name"]
                         if name in TARGETS:

@@ -58,7 +58,9 @@ restoration to persistent database storage. A live copy of the open H2 file
 is not a verified backup. Migrating identity storage is a separate change;
 do not add a blank PVC and assume it contains the existing data. Once restored
 and validated, change `updateStrategy` back to `RollingUpdate`, roll Keycloak,
-then verify existing users and the Dex/Grafana/Argo CD login flows.
+then verify existing users and the Dex/Grafana/Argo CD login flows. In the same
+change, drop the `OnDelete` assertion from `scripts/check-memory-resources.py`;
+the lint job otherwise rejects the restored strategy.
 
 Keycloak's JVM sizes its heap relative to the container memory limit; the
 2Gi limit retains startup/non-heap headroom. See [Keycloak container memory
