@@ -86,6 +86,14 @@ def main():
     container = controller["spec"]["template"]["spec"]["containers"][0]
     assert container["name"] == "argocd-application-controller"
     budget(container["resources"], container["name"])
+    # Both deployments exceeded 430Mi during the observed window; reject the
+    # previous 256Mi request without requiring one exact implementation value.
+    for env in ("stage",):
+        app = yaml.safe_load((ROOT / f"platform/apps/app-{env}.yaml").read_text())
+        primary = app["spec"]["source"]["helm"]["valuesObject"]["mysql"]["primary"]
+        resources = primary.get("resources", {})
+        budget(resources, f"MySQL {env}")
+        assert mib(resources["requests"]["memory"]) >= 450, f"MySQL {env}: request below observed usage"
     print("Effective memory requests/limits and Grafana placement: OK")
 
 
