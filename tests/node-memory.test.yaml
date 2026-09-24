@@ -1,0 +1,46 @@
+rule_files:
+  - rules.yaml
+evaluation_interval: 1m
+tests:
+  - name: sustained low headroom fires after fifteen minutes and recovers
+    interval: 1m
+    input_series:
+      - series: 'node_memory_MemTotal_bytes{instance="worker:9100"}'
+        values: '1000+0x30'
+      - series: 'node_memory_MemAvailable_bytes{instance="worker:9100"}'
+        values: '150+0x20 300+0x9'
+      - series: 'node_uname_info{instance="worker:9100",nodename="worker"}'
+        values: '1+0x30'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: KubeQuestNodeMemoryHeadroomLow
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: KubeQuestNodeMemoryHeadroomLow
+        exp_alerts:
+          - exp_labels:
+              instance: worker:9100
+              nodename: worker
+              severity: warning
+            exp_annotations:
+              summary: 'Less than 20% memory available on worker for 15 minutes'
+              runbook_url: https://github.com/Bxota/T-CLO-901-infra/blob/main/docs/runbooks/worker-memory.md
+      - eval_time: 21m
+        alertname: KubeQuestNodeMemoryHeadroomLow
+        exp_alerts: []
+  - name: brief spike and exact threshold do not fire
+    interval: 1m
+    input_series:
+      - series: 'node_memory_MemTotal_bytes{instance="worker:9100"}'
+        values: '1000+0x30'
+      - series: 'node_memory_MemAvailable_bytes{instance="worker:9100"}'
+        values: '100+0x4 200+0x25'
+      - series: 'node_uname_info{instance="worker:9100",nodename="worker"}'
+        values: '1+0x30'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: KubeQuestNodeMemoryHeadroomLow
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: KubeQuestNodeMemoryHeadroomLow
+        exp_alerts: []

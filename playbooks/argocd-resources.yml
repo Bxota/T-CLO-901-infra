@@ -1,0 +1,27 @@
+---
+# Run from a checkout on kube-1; does not reinstall or upgrade Argo CD.
+- hosts: localhost
+  connection: local
+  become: true
+  tasks:
+    - name: Set the application controller memory budget
+      ansible.builtin.command:
+        argv:
+          - k3s
+          - kubectl
+          - -n
+          - argocd
+          - patch
+          - statefulset
+          - argocd-application-controller
+          - --type=strategic
+          - --patch-file
+          - '{{ playbook_dir }}/files/argocd-controller-resources.yaml'
+      register: controller_patch
+      changed_when: "'patched (no change)' not in controller_patch.stdout"
+
+    - name: Wait for the application controller rollout
+      ansible.builtin.command: >
+        k3s kubectl -n argocd rollout status statefulset/argocd-application-controller
+        --timeout=300s
+      changed_when: false

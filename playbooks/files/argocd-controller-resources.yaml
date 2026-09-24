@@ -1,0 +1,13 @@
+# Strategic merge patch: retain the upstream container's image, arguments,
+# volumes, probes and security settings. Argo CD itself is owned by Ansible.
+spec:
+  template:
+    spec:
+      containers:
+        - name: argocd-application-controller
+          resources:
+            requests:
+              cpu: 100m
+              memory: 640Mi
+            limits:
+              memory: 1Gi
