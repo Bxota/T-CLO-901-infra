@@ -88,7 +88,7 @@ def main():
     budget(container["resources"], container["name"])
     # Both deployments exceeded 430Mi during the observed window; reject the
     # previous 256Mi request without requiring one exact implementation value.
-    for env in ("stage",):
+    for env in ("prod", "stage"):
         app = yaml.safe_load((ROOT / f"platform/apps/app-{env}.yaml").read_text())
         primary = app["spec"]["source"]["helm"]["valuesObject"]["mysql"]["primary"]
         resources = primary.get("resources", {})

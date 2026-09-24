@@ -21,6 +21,13 @@ spec:
         backup: {enabled: true}
         mysql:
           primary:
+            resources:
+              requests:
+                cpu: 100m
+                memory: 512Mi
+              limits:
+                cpu: 500m
+                memory: 1Gi
             persistence:
               selector:
                 matchLabels: {app.kubernetes.io/component: mysql-data}
