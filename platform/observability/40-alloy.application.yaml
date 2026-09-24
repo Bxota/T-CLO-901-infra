@@ -15,6 +15,12 @@ spec:
       releaseName: alloy
       values: |
         alloy:
+          resources:
+            requests:
+              cpu: 25m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
           configMap:
             content: |
               discovery.kubernetes "pods" {
@@ -60,6 +66,13 @@ spec:
               }
           mounts:
             varlog: true
+        configReloader:
+          resources:
+            requests:
+              cpu: 10m
+              memory: 50Mi
+            limits:
+              memory: 128Mi
         controller:
           tolerations:
             - key: node-role.kubernetes.io/control-plane

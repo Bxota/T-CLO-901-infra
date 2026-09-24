@@ -11,6 +11,7 @@ resources:
   - 50-headlamp.application.yaml
   - 60-routes.yaml
   - 70-alert-rules.yaml
+  - 71-node-memory-rules.yaml
   - 80-servicemonitors.yaml
   - 81-envoy-podmonitor.yaml
 

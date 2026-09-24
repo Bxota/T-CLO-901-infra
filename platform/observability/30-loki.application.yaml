@@ -37,6 +37,12 @@ spec:
             delete_request_store: filesystem
         singleBinary:
           replicas: 1
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              memory: 768Mi
           persistence:
             enabled: true
             storageClass: "-"
@@ -44,6 +50,13 @@ spec:
             selector:
               matchLabels:
                 app.kubernetes.io/component: loki-data
+        sidecar:
+          resources:
+            requests:
+              cpu: 10m
+              memory: 96Mi
+            limits:
+              memory: 192Mi
         read:
           replicas: 0
         write:

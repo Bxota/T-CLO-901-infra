@@ -30,6 +30,12 @@ spec:
           enabled: false
         prometheus:
           prometheusSpec:
+            resources:
+              requests:
+                cpu: 100m
+                memory: 1Gi
+              limits:
+                memory: 2Gi
             nodeSelector:
               node-role.kubernetes.io/control-plane: "true"
             tolerations:
@@ -58,6 +64,12 @@ spec:
             - pods=[app.kubernetes.io/version]
         alertmanager:
           alertmanagerSpec:
+            resources:
+              requests:
+                cpu: 10m
+                memory: 64Mi
+              limits:
+                memory: 256Mi
             # Mounted at /etc/alertmanager/secrets/alertmanager-discord/; the
             # SealedSecret lives in 15-alertmanager-discord.sealedsecret.yaml.
             secrets:
@@ -91,7 +103,30 @@ spec:
                   - webhook_url_file: /etc/alertmanager/secrets/alertmanager-discord/webhook-url
                     send_resolved: true
         grafana:
+          resources:
+            requests:
+              cpu: 50m
+              memory: 640Mi
+            limits:
+              memory: 1Gi
+          # Soft separation: retain failover when only one worker is available.
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    namespaces: [identity]
+                    labelSelector:
+                      matchLabels:
+                        app.kubernetes.io/instance: keycloak
+                    topologyKey: kubernetes.io/hostname
           sidecar:
+            resources:
+              requests:
+                cpu: 10m
+                memory: 96Mi
+              limits:
+                memory: 192Mi
             dashboards:
               folderAnnotation: grafana_folder
               provider:

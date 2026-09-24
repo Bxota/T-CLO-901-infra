@@ -37,6 +37,14 @@
         k3s kubectl -n argocd delete application app
         --cascade=orphan --ignore-not-found=true
 
+    - name: Set the application controller memory budget
+      ansible.builtin.command: >
+        k3s kubectl -n argocd patch statefulset argocd-application-controller
+        --type=strategic
+        --patch-file /tmp/T-CLO-901-infra-bootstrap/playbooks/files/argocd-controller-resources.yaml
+      register: controller_patch
+      changed_when: "'patched (no change)' not in controller_patch.stdout"
+
     - name: Apply the root Argo CD Application
       ansible.builtin.command: k3s kubectl apply -f /tmp/T-CLO-901-infra-bootstrap/argocd/apps/root.yaml
 
