@@ -23,6 +23,13 @@ spec:
           enabled: false
         mysql:
           primary:
+            resources:
+              requests:
+                cpu: 100m
+                memory: 512Mi
+              limits:
+                cpu: 500m
+                memory: 1Gi
             persistence:
               storageClass: local-path
         sealedSecrets:
