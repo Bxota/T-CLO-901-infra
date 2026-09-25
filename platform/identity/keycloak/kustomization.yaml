@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - 00-keycloak.application.yaml
   - httproute.yaml
+  - httproute-internal.yaml

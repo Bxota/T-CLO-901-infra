@@ -11,6 +11,7 @@ metadata:
 spec:
   secretName: app-tls
   dnsNames:
+    - app.bxota.com
     - app.15.224.195.86.sslip.io
     - app-stage.15.224.195.86.sslip.io
   issuerRef:
@@ -108,6 +109,31 @@ spec:
   secretName: argocd-tls
   dnsNames:
     - argocd.15.224.195.86.sslip.io
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: letsencrypt-staging
+---
+# Every internal hostname, served only by internal-gateway. No
+# networking.kubequest2.io/certificate label yet: it stays on the staging
+# issuer until DNS-01 is proven (Task 7 adds the label).
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: internal-certificate
+  namespace: envoy-gateway-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  secretName: internal-tls
+  dnsNames:
+    - grafana.bxota.com
+    - argocd.bxota.com
+    - headlamp.bxota.com
+    - dex.bxota.com
+    - keycloak.bxota.com
+    - app-stage.bxota.com
   issuerRef:
     group: cert-manager.io
     kind: ClusterIssuer

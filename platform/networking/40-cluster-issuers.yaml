@@ -19,6 +19,28 @@ spec:
                 namespace: envoy-gateway-system
                 kind: Gateway
                 sectionName: http
+      # Internal names resolve to kube-1's Tailscale IP, unreachable for
+      # Let's Encrypt: they prove ownership through a TXT record instead.
+      - selector:
+          dnsNames:
+            - grafana.bxota.com
+            - argocd.bxota.com
+            - headlamp.bxota.com
+            - dex.bxota.com
+            - keycloak.bxota.com
+            - app-stage.bxota.com
+        dns01:
+          webhook:
+            groupName: acme.fabmade.de
+            solverName: ionos
+            config:
+              apiUrl: https://api.hosting.ionos.com/dns/v1
+              publicKeySecretRef:
+                name: ionos-secret
+                key: IONOS_PUBLIC_PREFIX
+              secretKeySecretRef:
+                name: ionos-secret
+                key: IONOS_SECRET
 ---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -41,3 +63,25 @@ spec:
                 namespace: envoy-gateway-system
                 kind: Gateway
                 sectionName: http
+      # Internal names resolve to kube-1's Tailscale IP, unreachable for
+      # Let's Encrypt: they prove ownership through a TXT record instead.
+      - selector:
+          dnsNames:
+            - grafana.bxota.com
+            - argocd.bxota.com
+            - headlamp.bxota.com
+            - dex.bxota.com
+            - keycloak.bxota.com
+            - app-stage.bxota.com
+        dns01:
+          webhook:
+            groupName: acme.fabmade.de
+            solverName: ionos
+            config:
+              apiUrl: https://api.hosting.ionos.com/dns/v1
+              publicKeySecretRef:
+                name: ionos-secret
+                key: IONOS_PUBLIC_PREFIX
+              secretKeySecretRef:
+                name: ionos-secret
+                key: IONOS_SECRET

@@ -1,0 +1,74 @@
+# Tailnet-only entry point. The Envoy Service is ClusterIP with kube-1's
+# Tailscale IP as externalIP: kube-proxy on kube-1 forwards traffic arriving
+# on tailscale0:443 to Envoy pods on the workers (externalTrafficPolicy
+# Cluster; Envoy never runs on the tainted kube-1). No NodePort: the public
+# IP never reaches this proxy. If kube-1 is rebuilt and its Tailscale IP
+# changes, update the IP here and the six IONOS A records (runbook 01).
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: internal-proxy
+  namespace: envoy-gateway-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  telemetry:
+    metrics:
+      prometheus:
+        disable: false
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService:
+        name: envoy-internal
+        type: ClusterIP
+        externalTrafficPolicy: Cluster
+        patch:
+          type: StrategicMerge
+          value:
+            spec:
+              externalIPs:
+                - 100.89.166.31
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: internal-envoy
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: internal-proxy
+    namespace: envoy-gateway-system
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: internal-gateway
+  namespace: envoy-gateway-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  gatewayClassName: internal-envoy
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: internal-tls
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values: [monitoring, headlamp, argocd, identity, app-stage]

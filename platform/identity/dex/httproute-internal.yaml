@@ -1,0 +1,18 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: dex-internal
+  namespace: identity
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  parentRefs:
+    - name: internal-gateway
+      namespace: envoy-gateway-system
+      sectionName: https
+  hostnames:
+    - dex.bxota.com
+  rules:
+    - backendRefs:
+        - name: dex
+          port: 5556

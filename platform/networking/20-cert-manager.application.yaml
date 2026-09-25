@@ -16,6 +16,11 @@ spec:
       values: |
         crds:
           enabled: true
+        # DNS-01 propagation checks ask public resolvers directly, not the
+        # VPC resolver, which may cache the NXDOMAIN of a fresh TXT record.
+        extraArgs:
+          - --dns01-recursive-nameservers-only
+          - --dns01-recursive-nameservers=1.1.1.1:53,8.8.8.8:53
         config:
           gatewayAPI:
             enabled: true

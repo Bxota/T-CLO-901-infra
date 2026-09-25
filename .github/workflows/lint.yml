@@ -40,3 +40,9 @@ jobs:
         run: python3 scripts/check-memory-resources.py
       - name: Test node memory alert
         run: python3 scripts/check-memory-alerts.py
+      - name: Check exposure model
+        run: scripts/check-exposure-config.sh
+      - name: Test the live exposure check
+        run: |
+          sudo apt-get install -y bats
+          bats tests

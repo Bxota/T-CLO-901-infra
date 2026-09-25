@@ -1,36 +1,121 @@
 ---
+# Run on kube-1 (pasted through SSM, see README):
+#   ansible-playbook server.yml -e tailscale_authkey=tskey-auth-...
+# The auth key is used only when the node is not on the tailnet yet.
+# Every k3s flag lives in /etc/rancher/k3s/config.yaml: changing a value here
+# and re-running the play rewrites the file and restarts k3s.
 - hosts: localhost
   connection: local
   become: true
+  vars:
+    tailscale_hostname: kube-1
+    oidc_issuer_url: https://dex.15.224.195.86.sslip.io
+  handlers:
+    - name: Restart k3s
+      ansible.builtin.systemd:
+        name: k3s
+        state: restarted
   tasks:
     - name: Install NFS client packages (needed for the shared EFS mount)
       ansible.builtin.dnf:
         name: nfs-utils
         state: present
 
+    - name: Install Tailscale
+      ansible.builtin.shell: curl -fsSL https://tailscale.com/install.sh | sh
+      args:
+        creates: /usr/bin/tailscale
+
+    - name: Start tailscaled
+      ansible.builtin.systemd:
+        name: tailscaled
+        state: started
+        enabled: true
+
+    - name: Read the tailnet login state
+      ansible.builtin.command: tailscale status --json
+      register: tailscale_status
+      changed_when: false
+      failed_when: false
+
+    # --ssh: the team logs in to the instances with Tailscale SSH (ec2-user).
+    - name: Join the tailnet
+      ansible.builtin.command: >
+        tailscale up --auth-key={{ tailscale_authkey }} --ssh
+        --advertise-tags=tag:aws-instances --hostname={{ tailscale_hostname }}
+      when: (tailscale_status.stdout | default('{}', true) | from_json).BackendState | default('') != 'Running'
+      no_log: true
+
+    - name: Read the node's Tailscale IPv4
+      ansible.builtin.command: tailscale ip -4
+      register: tailscale_ip
+      changed_when: false
+
+    - name: Create the k3s config directory
+      ansible.builtin.file:
+        path: /etc/rancher/k3s
+        state: directory
+        mode: "0755"
+
+    - name: Write the k3s server configuration
+      ansible.builtin.copy:
+        dest: /etc/rancher/k3s/config.yaml
+        mode: "0600"
+        content: |
+          disable:
+            - traefik
+            - servicelb
+          node-taint:
+            - node-role.kubernetes.io/control-plane:NoSchedule
+          service-node-port-range: 80-32767
+          # kubectl from team laptops over the tailnet.
+          tls-san:
+            - {{ tailscale_ip.stdout | trim }}
+          # NodePorts answer on the VPC address only, never on tailscale0:
+          # the Tailscale IP belongs to the internal gateway.
+          kube-proxy-arg:
+            - nodeport-addresses=primary
+          # Quoted: an unquoted item ending with ':' parses as a YAML map and
+          # k3s hands the apiserver a broken flag.
+          kube-apiserver-arg:
+            - "oidc-issuer-url={{ oidc_issuer_url }}"
+            - "oidc-client-id=kubernetes"
+            - "oidc-username-claim=email"
+            - "oidc-username-prefix=oidc:"
+            - "oidc-groups-claim=groups"
+            - "oidc-groups-prefix=oidc:"
+      notify: Restart k3s
+
     - name: Install k3s server
-      ansible.builtin.shell: |
-        curl -sfL https://get.k3s.io | sh -s - server \
-          --disable traefik \
-          --disable servicelb \
-          --node-taint node-role.kubernetes.io/control-plane:NoSchedule \
-          --service-node-port-range=80-32767 \
-          --kube-apiserver-arg=oidc-issuer-url=https://dex.15.224.195.86.sslip.io \
-          --kube-apiserver-arg=oidc-client-id=kubernetes \
-          --kube-apiserver-arg=oidc-username-claim=email \
-          --kube-apiserver-arg=oidc-username-prefix=oidc: \
-          --kube-apiserver-arg=oidc-groups-claim=groups \
-          --kube-apiserver-arg=oidc-groups-prefix=oidc:
+      ansible.builtin.shell: curl -sfL https://get.k3s.io | sh -s - server
       args:
         creates: /usr/local/bin/k3s
+
+    - name: Check whether the systemd unit still carries inline flags
+      ansible.builtin.command: grep -q -- 'kube-apiserver-arg' /etc/systemd/system/k3s.service
+      register: k3s_inline_flags
+      changed_when: false
+      failed_when: false
+
+    - name: Rewrite the unit without inline flags (config.yaml is the only source)
+      ansible.builtin.shell: curl -sfL https://get.k3s.io | INSTALL_K3S_SKIP_DOWNLOAD=true sh -s - server
+      when: k3s_inline_flags.rc == 0
+
+    - name: Apply a changed configuration now
+      ansible.builtin.meta: flush_handlers
+
+    - name: Wait for every node to be Ready
+      ansible.builtin.command: k3s kubectl wait --for=condition=Ready node --all --timeout=180s
+      changed_when: false
 
     - name: Fetch the node join token
       ansible.builtin.slurp:
         src: /var/lib/rancher/k3s/server/node-token
       register: join_token
 
-    - name: Print private IP and join token for the agents
+    - name: Print private IP, Tailscale IP and join token for the agents
       ansible.builtin.debug:
         msg:
           - "PRIVATE_IP={{ ansible_default_ipv4.address }}"
+          - "TAILSCALE_IP={{ tailscale_ip.stdout | trim }}"
           - "TOKEN={{ join_token.content | b64decode | trim }}"

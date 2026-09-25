@@ -1,0 +1,15 @@
+# Pods are not on the tailnet. Dex (to Keycloak) and Grafana, Argo CD and
+# Headlamp (to Dex) call these issuers server-side: resolve them to the
+# internal Envoy Service so the hostname, TLS and certificate stay the same as
+# in the browser. k3s imports *.override keys into the main server block.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-custom
+  namespace: kube-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+data:
+  bxota-internal.override: |
+    rewrite name exact dex.bxota.com envoy-internal.envoy-gateway-system.svc.cluster.local
+    rewrite name exact keycloak.bxota.com envoy-internal.envoy-gateway-system.svc.cluster.local
