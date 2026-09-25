@@ -44,6 +44,7 @@ q 'select(.kind == "Gateway" and .metadata.name == "public-gateway") | .spec.lis
 
 cert='select(.kind == "Certificate" and .metadata.name == "internal-certificate")'
 [ "$(q "$cert | .spec.secretName")" = internal-tls ] || fail "internal-certificate must write internal-tls"
+[ "$(q "$cert | .spec.issuerRef.name")" = letsencrypt-production ]   || fail "internal-certificate must use letsencrypt-production (browsers and pods must trust it)"
 [ "$(q "$cert | .spec.dnsNames | join(\" \")" | sorted)" = "$internal_hosts" ] \
   || fail "internal-certificate dnsNames must be exactly: $internal_hosts"
 
