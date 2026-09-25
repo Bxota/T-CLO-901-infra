@@ -75,13 +75,15 @@
           # the Tailscale IP belongs to the internal gateway.
           kube-proxy-arg:
             - nodeport-addresses=primary
+          # Quoted: an unquoted item ending with ':' parses as a YAML map and
+          # k3s hands the apiserver a broken flag.
           kube-apiserver-arg:
-            - oidc-issuer-url={{ oidc_issuer_url }}
-            - oidc-client-id=kubernetes
-            - oidc-username-claim=email
-            - oidc-username-prefix=oidc:
-            - oidc-groups-claim=groups
-            - oidc-groups-prefix=oidc:
+            - "oidc-issuer-url={{ oidc_issuer_url }}"
+            - "oidc-client-id=kubernetes"
+            - "oidc-username-claim=email"
+            - "oidc-username-prefix=oidc:"
+            - "oidc-groups-claim=groups"
+            - "oidc-groups-prefix=oidc:"
       notify: Restart k3s
 
     - name: Install k3s server
