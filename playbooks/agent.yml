@@ -1,4 +1,8 @@
 ---
+# Run on kube-2 / kube-3:
+#   ansible-playbook agent.yml -e k3s_server_ip=<PRIVATE_IP> -e k3s_token='<TOKEN>' \
+#     -e tailscale_hostname=kube-2 -e tailscale_authkey=tskey-auth-...
+# Workers join the tailnet for SSH only; nothing in the exposure model uses them.
 - hosts: localhost
   connection: local
   become: true
@@ -7,6 +11,31 @@
       ansible.builtin.dnf:
         name: nfs-utils
         state: present
+
+    - name: Install Tailscale
+      ansible.builtin.shell: curl -fsSL https://tailscale.com/install.sh | sh
+      args:
+        creates: /usr/bin/tailscale
+
+    - name: Start tailscaled
+      ansible.builtin.systemd:
+        name: tailscaled
+        state: started
+        enabled: true
+
+    - name: Read the tailnet login state
+      ansible.builtin.command: tailscale status --json
+      register: tailscale_status
+      changed_when: false
+      failed_when: false
+
+    # --ssh: the team logs in to the instances with Tailscale SSH (ec2-user).
+    - name: Join the tailnet
+      ansible.builtin.command: >
+        tailscale up --auth-key={{ tailscale_authkey }} --ssh
+        --advertise-tags=tag:aws-instances --hostname={{ tailscale_hostname }}
+      when: (tailscale_status.stdout | default('{}', true) | from_json).BackendState | default('') != 'Running'
+      no_log: true
 
     - name: Install k3s agent and join the cluster
       ansible.builtin.shell: |

@@ -2,7 +2,8 @@
 # First-bootstrap path only. On a cluster whose SealedSecrets (platform/identity/sealed)
 # have already been synced by the platform Application, the existence check below finds
 # identity/dex-config and every secret-generation task is skipped; the play then only
-# applies the k3s OIDC flags and the Argo CD ConfigMap patches. Regenerating secrets here
+# applies the Argo CD ConfigMap patches. The k3s OIDC flags belong to server.yml
+# (/etc/rancher/k3s/config.yaml). Regenerating secrets here
 # would desynchronise them from the committed SealedSecrets.
 - hosts: localhost
   connection: local
@@ -138,31 +139,6 @@
         - /tmp/kubequest2-realm.json
         - /tmp/dex-config.yaml
       when: dex_config_secret.rc != 0
-
-    - name: Check whether the live k3s unit already has the OIDC flags
-      ansible.builtin.command: grep -q oidc-issuer-url /etc/systemd/system/k3s.service
-      register: k3s_oidc_flags
-      failed_when: false
-      changed_when: false
-
-    - name: Re-run the k3s installer with OIDC flags added (rewrites the systemd unit, restarts k3s)
-      ansible.builtin.shell: |
-        curl -sfL https://get.k3s.io | sh -s - server \
-          --disable traefik \
-          --disable servicelb \
-          --node-taint node-role.kubernetes.io/control-plane:NoSchedule \
-          --service-node-port-range=80-32767 \
-          --kube-apiserver-arg=oidc-issuer-url=https://dex.15.224.195.86.sslip.io \
-          --kube-apiserver-arg=oidc-client-id=kubernetes \
-          --kube-apiserver-arg=oidc-username-claim=email \
-          --kube-apiserver-arg=oidc-username-prefix=oidc: \
-          --kube-apiserver-arg=oidc-groups-claim=groups \
-          --kube-apiserver-arg=oidc-groups-prefix=oidc:
-      when: k3s_oidc_flags.rc != 0
-
-    - name: Wait for the apiserver to come back after the restart
-      ansible.builtin.command: k3s kubectl wait --for=condition=Ready node --all --timeout=180s
-      changed_when: false
 
     - name: Patch argocd-cm with the Dex OIDC config
       ansible.builtin.command: >
