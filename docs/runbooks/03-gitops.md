@@ -46,7 +46,7 @@ What `argocd-bootstrap.yml` does, in order:
 4. Applies `argocd/apps/root.yaml`. From here on, Argo CD owns everything.
 5. Sets `server.insecure: "true"` in `argocd-cmd-params-cm` and restarts `argocd-server`: TLS terminates on the public Gateway, Argo CD serves plain HTTP behind it.
 
-The Argo CD UI is reachable at `https://argocd.15.224.195.86.sslip.io` (HTTPRoute in `platform/argocd-ui/`, synced by `platform`). The local `admin` account is disabled once `identity-bootstrap.yml` has run; login is through Dex (see 04). Until then, the initial admin password is in `secret/argocd-initial-admin-secret`.
+The Argo CD UI is reachable at `https://argocd.bxota.com` (HTTPRoute in `platform/argocd-ui/`, synced by `platform`). The local `admin` account is disabled once `identity-bootstrap.yml` has run; login is through Dex (see 04). Until then, the initial admin password is in `secret/argocd-initial-admin-secret`.
 
 ## App-of-apps layout
 
