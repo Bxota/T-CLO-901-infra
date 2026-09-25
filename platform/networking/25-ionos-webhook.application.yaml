@@ -1,0 +1,34 @@
+# DNS-01 solver for bxota.com (IONOS DNS). Wave 0: after cert-manager (-1),
+# whose CRDs the chart uses for its own serving certificate.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager-webhook-ionos
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://fabmade.github.io/cert-manager-webhook-ionos
+    chart: cert-manager-webhook-ionos
+    targetRevision: 1.3.1
+    helm:
+      releaseName: cert-manager-webhook-ionos
+      values: |
+        groupName: acme.fabmade.de
+        certManager:
+          namespace: cert-manager
+          serviceAccountName: cert-manager
+        # The chart defaults to :latest; pin the chart's appVersion.
+        image:
+          tag: "1.3.1"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

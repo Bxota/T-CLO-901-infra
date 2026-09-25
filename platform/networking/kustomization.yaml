@@ -4,6 +4,7 @@ resources:
   - 00-namespaces.yaml
   - 10-envoy-gateway.application.yaml
   - 20-cert-manager.application.yaml
+  - 25-ionos-webhook.application.yaml
   - 30-public-gateway.yaml
   - 40-cluster-issuers.yaml
   - overlays/production
