@@ -9,7 +9,6 @@ resources:
   - 30-loki.application.yaml
   - 40-alloy.application.yaml
   - 50-headlamp.application.yaml
-  - 60-routes.yaml
   - 61-internal-routes.yaml
   - 70-alert-rules.yaml
   - 71-node-memory-rules.yaml

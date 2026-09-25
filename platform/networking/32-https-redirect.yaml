@@ -1,0 +1,24 @@
+# Plain HTTP on app.bxota.com redirects to HTTPS. cert-manager's HTTP-01
+# solver routes match an exact /.well-known/acme-challenge/<token> path,
+# which is more specific and wins over this catch-all.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: https-redirect
+  namespace: envoy-gateway-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  parentRefs:
+    - name: public-gateway
+      namespace: envoy-gateway-system
+      sectionName: http
+  hostnames:
+    - app.bxota.com
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
