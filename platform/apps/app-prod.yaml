@@ -16,7 +16,9 @@ spec:
       valuesObject:
         replicaCount: 2
         route:
-          host: app.15.224.195.86.sslip.io
+          host: app.bxota.com
+        env:
+          APP_URL: https://app.bxota.com
         efs: {enabled: true}
         backup: {enabled: true}
         mysql:

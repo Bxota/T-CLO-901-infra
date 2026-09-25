@@ -13,9 +13,13 @@ spec:
       valuesObject:
         replicaCount: 1
         route:
-          host: app-stage.15.224.195.86.sslip.io
+          host: app-stage.bxota.com
+          gateway:
+            name: internal-gateway
+            namespace: envoy-gateway-system
+            sectionName: https
         env:
-          APP_URL: https://app-stage.15.224.195.86.sslip.io
+          APP_URL: https://app-stage.bxota.com
           APP_DEPLOY_ENV: staging
         efs:
           enabled: false
