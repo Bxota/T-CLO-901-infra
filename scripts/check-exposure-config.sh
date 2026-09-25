@@ -34,7 +34,8 @@ proxy='select(.kind == "EnvoyProxy" and .metadata.name == "internal-proxy") | .s
 [ "$(q "$proxy | .name")" = envoy-internal ] || fail "internal-proxy Service must be named envoy-internal"
 [ "$(q "$proxy | .externalTrafficPolicy")" = Cluster ] \
   || fail "internal-proxy needs externalTrafficPolicy Cluster (Envoy never runs on kube-1)"
-ips=$(q "$proxy | (.patch.value.spec.externalIPs // []) | join(\" \")")
+# yq's // yields an empty result per non-matching document: drop blank lines.
+ips=$(q "$proxy | (.patch.value.spec.externalIPs // []) | join(\" \")" | sed '/^$/d')
 { [ "$(wc -w <<<"$ips")" -eq 1 ] && [[ $ips =~ $tailnet_ip ]]; } \
   || fail "internal-proxy externalIPs must be kube-1's single Tailscale IP, got '$ips'"
 
