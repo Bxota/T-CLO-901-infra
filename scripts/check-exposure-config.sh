@@ -57,6 +57,17 @@ while read -r route host parents; do
   fi
 done < <(q 'select(.kind == "HTTPRoute") | (.metadata.namespace + "/" + .metadata.name) as $r | (.spec.parentRefs | map(.name) | unique | join(",")) as $p | (.spec.hostnames // [])[] | $r + " " + . + " " + $p')
 
+# Argo CD waits for each sync wave to be healthy; a route in an earlier wave
+# than its Gateway never becomes healthy and blocks the whole sync. A missing
+# annotation is wave 0 (set per document with |=: a bare // would also answer
+# for documents select() filtered out, and "x" + null drops the line).
+wave='.metadata.annotations["argocd.argoproj.io/sync-wave"] |= (. // "0")'
+gw_wave=$(q "$gw | $wave | .metadata.annotations[\"argocd.argoproj.io/sync-wave\"]")
+while read -r route rwave; do
+  [ -n "$route" ] || continue
+  [ "$rwave" -ge "$gw_wave" ] || fail "$route is in sync wave $rwave, before internal-gateway (wave $gw_wave): the sync deadlocks"
+done < <(q "select(.kind == \"HTTPRoute\") | select(.spec.parentRefs[].name == \"internal-gateway\") | $wave | .metadata.namespace + \"/\" + .metadata.name + \" \" + .metadata.annotations[\"argocd.argoproj.io/sync-wave\"]" | sort -u)
+
 # Pods reach Dex and Keycloak through the internal Envoy Service.
 cm=$(q 'select(.kind == "ConfigMap" and .metadata.name == "coredns-custom" and .metadata.namespace == "kube-system") | .data["bxota-internal.override"]')
 for h in dex.bxota.com keycloak.bxota.com; do
