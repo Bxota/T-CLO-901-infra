@@ -21,7 +21,7 @@
 | Realm `kubequest2` | Keycloak import at startup | 3 groups, 3 demo users, client `dex`, scopes `email` and `groups` (group mapper without full path) | `playbooks/templates/kubequest2-realm.json.j2` |
 | Dex 2.44.0 (`dexidp/dex` 0.24.1) | `platform` Application, wave `1`, namespace `identity` | `config.yaml` from Secret `dex-config`: one `oidc` connector to Keycloak, four static clients | `platform/identity/dex/`, `playbooks/templates/dex-config.yaml.j2` |
 | Identity Secrets (`keycloak-admin`, `keycloak-realm-config`, `dex-config`, `argocd-dex-client`, `grafana-dex-client`, `headlamp-dex-client`) | `platform` Application, waves `-1` and `3` | SealedSecrets, unsealed by the controller from [07](07-secrets-registry.md) | `platform/identity/sealed/` |
-| Kubernetes API OIDC flags | `playbooks/server.yml` (fresh install) or `playbooks/identity-bootstrap.yml` (existing node) | `--kube-apiserver-arg=oidc-*` on k3s | `playbooks/` |
+| Kubernetes API OIDC flags | `playbooks/server.yml` (fresh install and existing node) | `kube-apiserver-arg: oidc-*` in `/etc/rancher/k3s/config.yaml`; re-running the play rewrites it and restarts k3s | `playbooks/server.yml` |
 | Group → roles | `platform` Application | `oidc:platform-admin` → `cluster-admin`; `oidc:developer` → `edit` on `app-stage`, `view` on `app` and `monitoring`; `oidc:viewer` → `view` on `app`, `app-stage`, `monitoring`; both get a minimal cluster read (namespaces, nodes) | `platform/identity/rbac/` |
 | Argo CD OIDC + RBAC | `playbooks/identity-bootstrap.yml` (imperative patch) | `argocd-cm` `oidc.config`, `admin.enabled: "false"`; `argocd-rbac-cm` `policy.csv` | `playbooks/files/argocd-*-patch.yaml` |
 | Grafana OIDC | kube-prometheus-stack Application values | `auth.generic_oauth` against Dex, login form disabled | `platform/observability/20-kube-prometheus-stack.application.yaml` |
@@ -34,10 +34,10 @@
 browser / kubelogin ──► tool (Argo CD, Grafana, Headlamp, kubectl)
                          │  OIDC, client id = argocd | grafana | headlamp | kubernetes
                          ▼
-                 Dex  https://dex.15.224.195.86.sslip.io
+                 Dex  https://dex.bxota.com
                          │  OIDC connector "keycloak", client id = dex
                          ▼
-             Keycloak  https://keycloak.15.224.195.86.sslip.io/realms/kubequest2
+             Keycloak  https://keycloak.bxota.com/realms/kubequest2
                          users, passwords, groups
 ```
 
@@ -66,7 +66,7 @@ Their passwords are the ones in `kubequest2-realm.json.j2`, with `temporary: fal
 
 If durable self-service accounts ever become a requirement, giving Keycloak a PostgreSQL is a platform change, not a runbook step.
 
-The Keycloak admin console is at `https://keycloak.15.224.195.86.sslip.io/admin/`, user `admin`, password in Secret `identity/keycloak-admin`:
+The Keycloak admin console is at `https://keycloak.bxota.com/admin/`, user `admin`, password in Secret `identity/keycloak-admin`:
 
 ```bash
 kubectl -n identity get secret keycloak-admin -o jsonpath='{.data.password}' | base64 -d; echo
@@ -98,11 +98,11 @@ The realm export is a SealedSecret whose plaintext contains Keycloak's `dex` cli
    git diff --cached | grep -c 'kind: Secret$'   # must print 0 after staging
    ```
 
-4. Commit the sealed file in the same PR. After the platform tag is pinned and synced, restart Keycloak so it re-imports:
+4. Commit the sealed file in the same PR. After the platform tag is pinned and synced, restart Keycloak so it re-imports. Its StatefulSet uses the `OnDelete` update strategy: `rollout restart` only marks it and the old pod keeps running, so delete the pod:
 
    ```bash
-   sudo k3s kubectl -n identity rollout restart statefulset/keycloak-keycloakx
-   sudo k3s kubectl -n identity rollout status statefulset/keycloak-keycloakx --timeout=5m
+   sudo k3s kubectl -n identity delete pod keycloak-keycloakx-0
+   sudo k3s kubectl -n identity wait --for=condition=Ready pod/keycloak-keycloakx-0 --timeout=5m
    ```
 
    With `--import-realm`, Keycloak only imports a realm that does not exist yet; on this ephemeral setup every start is a fresh import, which is why the restart is enough.
@@ -131,8 +131,7 @@ What the play does:
 
 1. Clones the infra repo to `/tmp` for its templates.
 2. Checks for `identity/dex-config`. **If it exists** (normal case, SealedSecrets synced), every secret-generation task is skipped. **If it does not** (first ever bootstrap, or a rebuild without the sealing key), it generates the Keycloak admin password and the four client secrets with `openssl rand`, renders the realm and Dex templates, creates the six Secrets, then shreds the rendered files. Running the generation path on a cluster that already has the SealedSecrets would desynchronise Keycloak's `dex` client secret from Dex's copy; the existence check is what prevents that.
-3. Re-runs the k3s installer with the six `--kube-apiserver-arg=oidc-*` flags if the systemd unit lacks them, and waits for the nodes to come back. Fresh installs already get the flags from `server.yml`.
-4. Patches `argocd-cm` (Dex issuer, client `argocd`, `admin.enabled: "false"`) and `argocd-rbac-cm` (group policy), then restarts `argocd-server`.
+3. Patches `argocd-cm` (Dex issuer, client `argocd`, `admin.enabled: "false"`) and `argocd-rbac-cm` (group policy), then restarts `argocd-server`.
 
 Order of appearance after a sync: Keycloak becomes Ready first (wave `0`), Dex follows (wave `1`, its connector needs Keycloak's discovery document), Grafana and Headlamp receive their client Secrets at wave `3`.
 
@@ -144,8 +143,8 @@ export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 kubectl -n identity get pods
 kubectl -n identity get secret keycloak-admin keycloak-realm-config dex-config grafana-dex-client headlamp-dex-client
 kubectl -n argocd get secret argocd-dex-client
-curl -fsS https://keycloak.15.224.195.86.sslip.io/realms/kubequest2/.well-known/openid-configuration | head -c 200; echo
-curl -fsS https://dex.15.224.195.86.sslip.io/.well-known/openid-configuration | head -c 200; echo
+curl -fsS https://keycloak.bxota.com/realms/kubequest2/.well-known/openid-configuration | head -c 200; echo
+curl -fsS https://dex.bxota.com/.well-known/openid-configuration | head -c 200; echo
 grep -o 'oidc-[a-z-]*=[^ ]*' /etc/systemd/system/k3s.service
 kubectl -n argocd get configmap argocd-cm -o jsonpath='{.data.admin\.enabled}{"\n"}{.data.oidc\.config}'
 kubectl get clusterrolebinding oidc-platform-admin oidc-developer oidc-viewer
@@ -155,7 +154,7 @@ The two `curl` calls run from `kube-1` on purpose: the API server fetches Dex's 
 
 ## `kubectl` through OIDC
 
-This is the one coverage item without a browser UI, and the one graders ask about. The procedure runs **on `kube-1`** so that it needs no change to the AWS security group and no extra `--tls-san`: the API is reached on `https://127.0.0.1:6443`. Dex's `kubernetes` client is public, and Dex accepts the out-of-band redirect (`urn:ietf:wg:oauth:2.0:oob`) for public clients, so kubelogin's keyboard flow works without touching the Dex config.
+This is the one coverage item without a browser UI, and the one graders ask about. The procedure runs **on `kube-1`**: the API is reached on `https://127.0.0.1:6443`. Dex's `kubernetes` client is public, and Dex accepts the out-of-band redirect (`urn:ietf:wg:oauth:2.0:oob`) for public clients, so kubelogin's keyboard flow works without touching the Dex config.
 
 Install [kubelogin](https://github.com/int128/kubelogin) once (Amazon Linux 2023, x86_64; adjust the version to the latest release):
 
@@ -180,7 +179,7 @@ kubectl config set-credentials oidc \
   --exec-command=kubectl \
   --exec-arg=oidc-login \
   --exec-arg=get-token \
-  --exec-arg=--oidc-issuer-url=https://dex.15.224.195.86.sslip.io \
+  --exec-arg=--oidc-issuer-url=https://dex.bxota.com \
   --exec-arg=--oidc-client-id=kubernetes \
   --exec-arg=--oidc-extra-scope=email \
   --exec-arg=--oidc-extra-scope=groups \
@@ -222,16 +221,16 @@ kubectl auth can-i delete pods -n app                # no  (view on prod)
 
 Never point this kubeconfig at the cluster-admin credentials; keep `KUBECONFIG` unset in other shells so `sudo k3s kubectl` keeps working as before.
 
-Workstation variant, **not enabled today**: it needs inbound TCP 6443 on the `kube-1` security group and `--tls-san 15.224.195.86` on the k3s server so the serving certificate covers the public IP. Both are infrastructure changes to review separately; with them, the same kubeconfig works with `--server=https://15.224.195.86:6443` and `--grant-type=authcode` (browser opens on `http://localhost:8000`, the redirect URI already declared for the `kubernetes` client).
+Tailnet variant, from a team laptop (enabled, not part of the defence): the API server's certificate also covers `kube-1`'s Tailscale IP (`tls-san` in `server.yml`) and the tailnet ACL admits TCP 6443 from team members, while port 6443 stays closed in the AWS security group. Copy `/var/lib/rancher/k3s/server/tls/server-ca.crt` from `kube-1`, then use the same kubeconfig with `--server=https://100.89.166.31:6443` and `--grant-type=authcode` (browser opens on `http://localhost:8000`, the redirect URI already declared for the `kubernetes` client).
 
 ## Tool logins for the defence
 
 | Tool | URL | What to show |
 | --- | --- | --- |
-| Argo CD | `https://argocd.15.224.195.86.sslip.io` | Only a "Log in via Dex" button, no username form. `alice-admin` has every action; `bob-dev` can sync but not create or delete Applications; `carol-view` sees everything read-only, `Sync` is refused. `admin` password login fails |
-| Grafana | `https://grafana.15.224.195.86.sslip.io` | Redirect straight to Dex. `alice-admin` lands as Grafana Admin (Administration menu visible), `bob-dev` as Editor, `carol-view` as Viewer |
-| Headlamp | `https://headlamp.15.224.195.86.sslip.io` | "Sign in" goes to Dex. `carol-view` can list but the Delete action is refused by the API (Headlamp uses the user's own token) |
-| Keycloak | `https://keycloak.15.224.195.86.sslip.io/admin/` | Realm `kubequest2`, Groups, Users, client `dex`. Show that it is config, not clicks: the same content is in `kubequest2-realm.json.j2` |
+| Argo CD | `https://argocd.bxota.com` | Only a "Log in via Dex" button, no username form. `alice-admin` has every action; `bob-dev` can sync but not create or delete Applications; `carol-view` sees everything read-only, `Sync` is refused. `admin` password login fails |
+| Grafana | `https://grafana.bxota.com` | Redirect straight to Dex. `alice-admin` lands as Grafana Admin (Administration menu visible), `bob-dev` as Editor, `carol-view` as Viewer |
+| Headlamp | `https://headlamp.bxota.com` | "Sign in" goes to Dex. `carol-view` can list but the Delete action is refused by the API (Headlamp uses the user's own token) |
+| Keycloak | `https://keycloak.bxota.com/admin/` | Realm `kubequest2`, Groups, Users, client `dex`. Show that it is config, not clicks: the same content is in `kubequest2-realm.json.j2` |
 
 Use a private browser window per user, or log out of Keycloak between users: Dex and Keycloak keep a session, so a second tool login reuses the previous identity.
 
@@ -279,12 +278,12 @@ The policy does not apply outside `app` and `app-stage` (`matchConditions`), so 
 ## Troubleshooting
 
 - **Keycloak login says invalid credentials for a demo user.** State is ephemeral; the only valid password is the one in the realm template. Anything changed via the UI was lost at the last restart.
-- **Dex shows "failed to connect to keycloak" / CrashLoop.** Keycloak is not Ready yet or its discovery URL is unreachable from the pod. `kubectl -n identity logs deploy/dex`, then `curl` the realm's `.well-known` from `kube-1`. Dex restarts on its own once Keycloak answers.
+- **Dex shows "failed to connect to keycloak" / CrashLoop.** Keycloak is not Ready yet, still serves an old hostname, or its discovery URL is unreachable from the pod. `kubectl -n identity logs deploy/dex`, then `curl` the realm's `.well-known` from `kube-1`. Dex retries on its own with crash-loop back-off (up to 5 minutes); `kubectl -n identity delete pod <dex pod>` retries at once.
 - **Dex "invalid client secret" from Keycloak.** `dex-config` and `keycloak-realm-config` were generated at different times. Both must come from the same run: either the SealedSecrets pair in Git or the same execution of `identity-bootstrap.yml`. Never mix a sealed one with a regenerated one.
-- **Token accepted by Dex but `kubectl` says Unauthorized.** Check the six `oidc-*` flags in `/etc/systemd/system/k3s.service` and that the API server can reach `https://dex.15.224.195.86.sslip.io` from `kube-1`. `journalctl -u k3s | grep -i oidc` shows the verification error.
+- **Token accepted by Dex but `kubectl` says Unauthorized.** Check the six `oidc-*` entries in `/etc/rancher/k3s/config.yaml` (list items ending with `:` must be quoted, or k3s fails to start) and that the API server can reach `https://dex.bxota.com` from `kube-1`. `journalctl -u k3s | grep -i oidc` shows the verification error.
 - **`kubectl auth whoami` shows no `oidc:<group>` entry.** The token lacks the `groups` claim: check the two `--oidc-extra-scope` args, and in Keycloak that the `groups` client scope is a default scope of the `dex` client (it is in the template).
 - **Argo CD still shows the username/password form.** `identity-bootstrap.yml` has not patched `argocd-cm`, or `argocd-server` was not restarted. Re-run the play; it is idempotent on this part.
-- **Grafana "login.OAuthLogin(NewTransportWithCode)" error.** Redirect URI mismatch: Grafana's `root_url` must be exactly `https://grafana.15.224.195.86.sslip.io` and Dex's `grafana` client must list `/login/generic_oauth` under it.
+- **Grafana "login.OAuthLogin(NewTransportWithCode)" error.** Redirect URI mismatch: Grafana's `root_url` must be exactly `https://grafana.bxota.com` and Dex's `grafana` client must list `/login/generic_oauth` under it.
 - **Headlamp signs in but every list is Forbidden.** Kubernetes RBAC, not Headlamp: the user's groups have no binding. Check `kubectl auth whoami` for the same user through kubelogin.
 - **A legitimate pod is refused in `app-stage`.** Read the exact CEL message; the usual case is a vendor image not yet mirrored under `ghcr.io/bxota/`.
 
@@ -295,3 +294,29 @@ The policy does not apply outside `app` and `app-stage` (`matchConditions`), so 
 3. `kubectl auth whoami` through kubelogin on `kube-1` for the three users: `auth can-i delete pods -n app` is `yes` for `alice-admin`, `no` for `bob-dev` and `carol-view`; `-n app-stage` is `yes` for `bob-dev`.
 4. `grep oidc /etc/systemd/system/k3s.service`: the API server itself is OIDC-configured, not only the tools.
 5. The three refused `kubectl run` commands against the admission policy, then the accepted control case.
+
+## Changing an identity URL
+
+The Dex config and the Keycloak realm are sealed and hold client secrets and user passwords, so a URL change is re-sealed **on `kube-1`**, from the live Secrets, and only ciphertext leaves the node:
+
+```bash
+umask 077; cd "$(mktemp -d)"
+curl -sSL https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.40.0/kubeseal-0.40.0-linux-amd64.tar.gz | tar -xz kubeseal
+curl -sSLo pub-cert.pem https://raw.githubusercontent.com/Bxota/T-CLO-901-infra/main/sealed-secrets/pub-cert.pem
+sudo k3s kubectl -n identity get secret dex-config -o jsonpath='{.data.config\.yaml}' | base64 -d > dex.yaml
+sudo k3s kubectl -n identity get secret keycloak-realm-config -o jsonpath='{.data.kubequest2-realm\.json}' | base64 -d > realm.json
+sed -i 's#<old host>#<new host>#g' dex.yaml realm.json       # URLs only
+grep -n 'https://' dex.yaml realm.json                         # check: no secret is on these lines
+./kubeseal --raw --cert pub-cert.pem --namespace identity --name dex-config --from-file=dex.yaml
+./kubeseal --raw --cert pub-cert.pem --namespace identity --name keycloak-realm-config --from-file=realm.json
+shred -u dex.yaml realm.json
+```
+
+Replace the `config.yaml` and `kubequest2-realm.json` values in `platform/identity/sealed/` with the two outputs. `headlamp-dex-client.OIDC_ISSUER_URL` is not secret and can be sealed from a workstation (`kubeseal --raw --namespace headlamp --name headlamp-dex-client --from-file=<file holding the URL>`). Change the same URLs in the plain-text files (`scripts/check-exposure-config.sh` lists them and fails while one still has the old host).
+
+After the release tag syncs, in this order (a login outage of a few minutes):
+
+1. Keycloak first: delete `keycloak-keycloakx-0` and wait for Ready (above). Dex checks its connector at start; a Dex started before Keycloak has its new hostname crash-loops.
+2. `sudo k3s kubectl -n identity rollout restart deploy/dex` and `sudo k3s kubectl -n headlamp rollout restart deploy/headlamp`.
+3. `ansible-playbook server.yml` (API server issuer; restarts k3s) and `ansible-playbook identity-bootstrap.yml` (`argocd-cm`, restarts `argocd-server`).
+4. `curl -s https://dex.bxota.com/.well-known/openid-configuration | grep -o '"issuer": *"[^"]*"'`, then log in on each tool.

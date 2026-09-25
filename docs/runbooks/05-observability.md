@@ -46,13 +46,14 @@ Expected: a JSON list of namespace names including at least `monitoring`, `headl
 
 ## Reach Grafana and Headlamp
 
+Both are served by `internal-gateway` and reachable only from a laptop on the tailnet (runbook 02):
+
 ```bash
-PUBLIC_IP=15.224.195.86
-curl -I --resolve "grafana.$PUBLIC_IP.sslip.io:443:$PUBLIC_IP" "https://grafana.$PUBLIC_IP.sslip.io/"
-curl -I --resolve "headlamp.$PUBLIC_IP.sslip.io:443:$PUBLIC_IP" "https://headlamp.$PUBLIC_IP.sslip.io/"
+curl -sI https://grafana.bxota.com/ | head -1     # 302 to the Dex login
+curl -sI https://headlamp.bxota.com/ | head -1    # 200
 ```
 
-Expected: `200` from both once the production ClusterIssuer is in use (spec 2); expect the staging-only `--insecure` flag if spec 2's promotion has not happened yet, matching the networking runbook's staging-vs-production guidance.
+Both use the trusted `internal-tls` certificate; no `--insecure`. From outside the tailnet both names are unreachable (`scripts/check-exposure.sh outside`).
 
 Grafana's admin password:
 
