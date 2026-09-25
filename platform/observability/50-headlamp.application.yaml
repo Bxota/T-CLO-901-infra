@@ -18,14 +18,14 @@ spec:
           oidc:
             secret:
               create: false
-            callbackURL: https://headlamp.15.224.195.86.sslip.io/oidc-callback
+            callbackURL: https://headlamp.bxota.com/oidc-callback
             externalSecret:
               enabled: true
               name: headlamp-dex-client
               hasScopes: true
         env:
           - name: OIDC_CALLBACK_URL
-            value: https://headlamp.15.224.195.86.sslip.io/oidc-callback
+            value: https://headlamp.bxota.com/oidc-callback
   destination:
     server: https://kubernetes.default.svc
     namespace: headlamp

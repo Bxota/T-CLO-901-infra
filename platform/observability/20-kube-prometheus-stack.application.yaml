@@ -158,7 +158,7 @@ spec:
                 key: clientSecret
           grafana.ini:
             server:
-              root_url: https://grafana.15.224.195.86.sslip.io
+              root_url: https://grafana.bxota.com
             auth:
               disable_login_form: true
             auth.generic_oauth:
@@ -166,9 +166,9 @@ spec:
               name: Dex
               allow_sign_up: true
               scopes: "openid email groups"
-              auth_url: https://dex.15.224.195.86.sslip.io/auth
-              token_url: https://dex.15.224.195.86.sslip.io/token
-              api_url: https://dex.15.224.195.86.sslip.io/userinfo
+              auth_url: https://dex.bxota.com/auth
+              token_url: https://dex.bxota.com/token
+              api_url: https://dex.bxota.com/userinfo
               role_attribute_path: "contains(groups[*], 'platform-admin') && 'GrafanaAdmin' || contains(groups[*], 'developer') && 'Editor' || 'Viewer'"
   destination:
     server: https://kubernetes.default.svc
