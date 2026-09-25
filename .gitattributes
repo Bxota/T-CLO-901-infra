@@ -1,0 +1,4 @@
+# Shell scripts and bats tests run in bash: keep LF even on Windows
+# checkouts (core.autocrlf would add carriage returns and break them).
+*.sh text eol=lf
+*.bats text eol=lf

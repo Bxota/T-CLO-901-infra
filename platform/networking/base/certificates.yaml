@@ -114,9 +114,9 @@ spec:
     kind: ClusterIssuer
     name: letsencrypt-staging
 ---
-# Every internal hostname, served only by internal-gateway. No
-# networking.kubequest2.io/certificate label yet: it stays on the staging
-# issuer until DNS-01 is proven (Task 7 adds the label).
+# Every internal hostname, served only by internal-gateway. The label name
+# predates this certificate: the production overlay patches every
+# Certificate carrying it to letsencrypt-production.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -125,6 +125,8 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  labels:
+    networking.kubequest2.io/certificate: public
 spec:
   secretName: internal-tls
   dnsNames:
