@@ -1,9 +1,9 @@
 data:
-  url: https://argocd.15.224.195.86.sslip.io
+  url: https://argocd.bxota.com
   admin.enabled: "false"
   oidc.config: |
     name: Dex
-    issuer: https://dex.15.224.195.86.sslip.io
+    issuer: https://dex.bxota.com
     clientID: argocd
     clientSecret: $argocd-dex-client:clientSecret
     requestedScopes: ["openid", "profile", "email", "groups"]

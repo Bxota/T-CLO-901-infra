@@ -1,4 +1,4 @@
-issuer: https://dex.15.224.195.86.sslip.io
+issuer: https://dex.bxota.com
 
 storage:
   type: kubernetes
@@ -16,10 +16,10 @@ connectors:
     id: keycloak
     name: Keycloak
     config:
-      issuer: https://keycloak.15.224.195.86.sslip.io/realms/kubequest2
+      issuer: https://keycloak.bxota.com/realms/kubequest2
       clientID: dex
       clientSecret: "{{ dex_client_secret }}"
-      redirectURI: https://dex.15.224.195.86.sslip.io/callback
+      redirectURI: https://dex.bxota.com/callback
       insecureSkipEmailVerified: true
       insecureEnableGroups: true
       userNameKey: email
@@ -42,16 +42,16 @@ staticClients:
     name: Argo CD
     secret: "{{ argocd_client_secret }}"
     redirectURIs:
-      - https://argocd.15.224.195.86.sslip.io/auth/callback
+      - https://argocd.bxota.com/auth/callback
 
   - id: grafana
     name: Grafana
     secret: "{{ grafana_client_secret }}"
     redirectURIs:
-      - https://grafana.15.224.195.86.sslip.io/login/generic_oauth
+      - https://grafana.bxota.com/login/generic_oauth
 
   - id: headlamp
     name: Headlamp
     secret: "{{ headlamp_client_secret }}"
     redirectURIs:
-      - https://headlamp.15.224.195.86.sslip.io/oidc-callback
+      - https://headlamp.bxota.com/oidc-callback

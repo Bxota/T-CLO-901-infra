@@ -87,6 +87,19 @@ prod=platform/apps/app-prod.yaml
 [ "$(yq "$v.route.gateway.name // \"public-gateway\"" "$prod")" = public-gateway ] || fail "app-prod must stay on public-gateway"
 [ "$(yq "$v.env.APP_URL" "$prod")" = https://app.bxota.com ] || fail "app-prod APP_URL must be https://app.bxota.com"
 
+# Identity: every issuer, callback and hostname in plain-text config is on
+# bxota.com (the sealed Dex, Keycloak and Headlamp values are checked live).
+identity_files="platform/identity/keycloak/00-keycloak.application.yaml
+platform/observability/20-kube-prometheus-stack.application.yaml
+platform/observability/50-headlamp.application.yaml
+playbooks/files/argocd-cm-oidc-patch.yaml
+playbooks/templates/dex-config.yaml.j2
+playbooks/templates/kubequest2-realm.json.j2
+playbooks/server.yml"
+for f in $identity_files; do
+  if grep -q 'sslip\.io' "$f"; then fail "$f still points at sslip.io"; fi
+done
+
 if $final; then
   if grep -q 'sslip\.io' "$build" platform/apps/*.yaml; then fail "sslip.io hostnames remain under platform/"; fi
   pub='select(.kind == "Gateway" and .metadata.name == "public-gateway") | .spec.listeners[]'

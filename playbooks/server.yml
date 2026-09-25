@@ -9,7 +9,7 @@
   become: true
   vars:
     tailscale_hostname: kube-1
-    oidc_issuer_url: https://dex.15.224.195.86.sslip.io
+    oidc_issuer_url: https://dex.bxota.com
   handlers:
     - name: Restart k3s
       ansible.builtin.systemd:

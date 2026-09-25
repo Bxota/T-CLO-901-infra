@@ -33,7 +33,7 @@ spec:
         args:
           - start
           - --http-enabled=true
-          - --hostname=https://keycloak.15.224.195.86.sslip.io
+          - --hostname=https://keycloak.bxota.com
           - --proxy-headers=xforwarded
           - --import-realm
         http:
