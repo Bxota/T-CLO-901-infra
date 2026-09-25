@@ -3,6 +3,10 @@ kind: HTTPRoute
 metadata:
   name: argocd-server-internal
   namespace: argocd
+  annotations:
+    # After internal-gateway (wave 1): Argo CD waits for each wave to be
+    # healthy, and a route whose Gateway does not exist yet never is.
+    argocd.argoproj.io/sync-wave: "4"
 spec:
   parentRefs:
     - name: internal-gateway
